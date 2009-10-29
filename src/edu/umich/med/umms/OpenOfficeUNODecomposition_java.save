@@ -1,0 +1,411 @@
+/*
+ * OfficeUNOClientApp31.java
+ *
+ * Created on 2009.08.17 - 10:37:43
+ *
+ */
+/* KWC
+package edu.umich.med.umms;
+
+import com.sun.star.uno.XComponentContext;
+import com.sun.star.comp.helper.Bootstrap;
+*/
+/**
+ *
+ * @author kwc
+ */
+/* KWC
+public class OfficeUNOClientApp31 {
+    
+    // Creates a new instance of OfficeUNOClientApp31
+    public OfficeUNOClientApp31() {
+    }
+    
+    //
+    // @param args the command line arguments
+    //
+    public static void main(String[] args) {
+        try {
+            // get the remote office component context
+            XComponentContext xContext = Bootstrap.bootstrap();
+            if (xContext == null) {
+                System.err.println("ERROR: Could not bootstrap default Office.");
+            }
+        }
+        catch (java.lang.Exception e){
+            e.printStackTrace();
+        }
+        finally {
+            System.exit( 0 );
+        }
+    }
+    
+}
+ */
+/*
+ * OfficeUNOClientApp.java
+ *
+ * Created on 2009.07.09 - 12:26:55
+ *
+ */
+
+package com.example;
+
+import com.sun.star.comp.helper.Bootstrap;
+import com.sun.star.uno.UnoRuntime;
+import com.sun.star.uno.XComponentContext;
+import com.sun.star.lang.XMultiComponentFactory;
+import com.sun.star.beans.PropertyValue;
+import com.sun.star.document.XTypeDetection;
+import com.sun.star.frame.XDesktop;
+import com.sun.star.frame.XComponentLoader;
+import com.sun.star.drawing.XDrawPagesSupplier;
+import com.sun.star.drawing.XDrawPages;
+import com.sun.star.drawing.XDrawPage;
+import com.sun.star.gallery.GalleryItemType;
+import com.sun.star.gallery.XGalleryThemeProvider;
+import com.sun.star.gallery.XGalleryTheme;
+import com.sun.star.gallery.XGalleryItem;
+
+
+/**
+ *
+ * @author kwc
+ */
+public class OfficeUNOClientApp31 {
+
+    /** Creates a new instance of OfficeUNOClientApp */
+    public OfficeUNOClientApp31() {
+    }
+
+
+    /**
+     * @param args the command line arguments
+     */
+    public static void main(String[] args) {
+        XComponentContext xContext = null;
+
+        for (int i = 0; i < args.length; i++) {
+            System.out.printf("args[%d] is '%s'\n", i, args[i]);
+            
+        }
+        
+        try {
+            // get the remote office component context
+            xContext = Bootstrap.bootstrap();
+            if (xContext == null) {
+                System.err.println("ERROR: Couldn't connect to OpenOffice process.");
+                System.exit(1);
+            }
+            System.out.println("Successfully connected to OpenOffice process!");
+
+            // get the remote office service manager
+            XMultiComponentFactory xMCF = xContext.getServiceManager();
+
+            /* A desktop environment contains tasks with one or more
+            frames in which components can be loaded. Desktop is the
+            environment for components which can instantiate within
+            frames. */
+            XDesktop desktop = (XDesktop) UnoRuntime.queryInterface(XDesktop.class,
+                    xMCF.createInstanceWithContext("com.sun.star.frame.Desktop",
+                    xContext));
+
+            XComponentLoader xCompLoader = (XComponentLoader) UnoRuntime.queryInterface(
+                    XComponentLoader.class, desktop);
+
+
+            // Set up to load the document
+            PropertyValue propertyValues[] = new PropertyValue[3];
+            propertyValues[0] = new PropertyValue();
+            propertyValues[0].Name = "Hidden";
+            propertyValues[0].Value = new Boolean(false);
+
+            propertyValues[1] = new PropertyValue();
+            propertyValues[1].Name = "ReadOnly";
+            propertyValues[1].Value = new Boolean(true);
+
+            propertyValues[2] = new PropertyValue();
+            propertyValues[2].Name = "FilterName";
+            propertyValues[2].Value = new String("pdf_Portable_Document_Format");
+
+//            String sFileName = "/Users/kwc/Downloads/OER/2009-civic-sedan-brochure-OO-modified.odg";
+//            String sFileName = "/Users/kwc/Downloads/OER/2009-civic-sedan-brochure.pdf";
+//            String sFileName = "/Users/kwc/Downloads/OER/2009-civic-sedan-brochure.reallyapdf";
+            String sFileName = args[0];
+            String sFileUrl = "file://" + sFileName;
+
+            // print document type
+            printDocumentType(xContext, xMCF, sFileUrl);
+
+            // Load a document
+            //System.out.print("Opening file '" + sFileName + "' ... ");
+            com.sun.star.lang.XComponent xComp = null;
+            try {
+                xComp = xCompLoader.loadComponentFromURL(
+                    sFileUrl, "_blank", 0, propertyValues);
+            } catch (java.lang.Exception e) {
+                System.out.printf("Failed to open file '%s', error was '%s'\n",
+                        sFileName, e.getMessage());
+                System.exit(2);
+            }
+
+            // Query for the interface XTextDocument on the xComp
+            com.sun.star.text.XTextDocument xTextDoc =
+                    (com.sun.star.text.XTextDocument) UnoRuntime.queryInterface(
+                    com.sun.star.text.XTextDocument.class, xComp);
+            if (xTextDoc == null) {
+                System.out.println("Failed to get xTextDoc from xComp");
+            } else {
+
+                // Querying for the interface XMultiServiceFactory on the xTextDoc
+                com.sun.star.lang.XMultiServiceFactory xMSFDoc =
+                        (com.sun.star.lang.XMultiServiceFactory) UnoRuntime.queryInterface(
+                        com.sun.star.lang.XMultiServiceFactory.class, xTextDoc);
+
+                if (xMSFDoc == null) {
+                    System.out.println("Failed to get xMSFDoc from xTextDoc");
+                } else {
+                    Object oGraphic = null;
+                    try {
+                        // Create the service GraphicObject
+                        oGraphic =
+                                xMSFDoc.createInstance("com.sun.star.text.TextGraphicObject");
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+
+                    // Getting the text
+                    com.sun.star.text.XText xText = xTextDoc.getText();
+
+                    String t = xText.getString();
+
+                    System.out.printf("The string I obtained was '%s'", t);
+
+                }
+            }
+
+            XDrawPagesSupplier xDrawPagesSuppl =
+                    (XDrawPagesSupplier) UnoRuntime.queryInterface(XDrawPagesSupplier.class, xComp);
+            if (xDrawPagesSuppl == null) {
+                System.out.println("Failed to get xDrawPagesSuppl from xComp");
+            }
+
+            XDrawPages xDrawPages = xDrawPagesSuppl.getDrawPages();
+            Object firstPage = xDrawPages.getByIndex(0);
+
+            int pageCount = xDrawPages.getCount();
+            System.out.printf("xDrawPages.getCount returned a value of '%d' pages\n", pageCount);
+
+            XDrawPage newPage =
+                    (XDrawPage) UnoRuntime.queryInterface(XDrawPage.class, xDrawPages.getByIndex(pageCount-1));
+
+            createSequence(xComp, newPage);
+
+            //put something on the drawpage
+            System.out.println("inserting some Shapes");
+
+            int beforeCount = newPage.getCount();
+            System.out.printf("newPage.getCount returned a value of '%d' (objects?)\n", beforeCount);
+
+            com.sun.star.drawing.XShapes xShapes = (com.sun.star.drawing.XShapes) UnoRuntime.queryInterface(
+                    com.sun.star.drawing.XShapes.class, newPage);
+            xShapes.add(createShape(xComp, 2000, 1500, 1000, 1000, "Line", 0));
+            xShapes.add(createShape(xComp, 3000, 4500, 15000, 1000, "Ellipse", 16711680));
+            xShapes.add(createShape(xComp, 5000, 3500, 7500, 5000, "Rectangle", 6710932));
+
+            enumeratePageImages(xComp, newPage);
+
+            int afterCount = newPage.getCount();
+            System.out.printf("newPage.getCount returned a value of '%d' (objects?)\n", afterCount);
+
+
+//            XSearchable xsearchable = (XSearchable) UnoRuntime.queryInterface(XSearchable.class, firstPage);
+//            if (xsearchable == null) {
+//                System.out.println("Failed to instantiate XSearchable");
+//                System.exit(1);
+//            }
+
+
+//            XStorable xStorable = (XStorable) UnoRuntime.queryInterface(XStorable.class, firstPage);
+
+//            com.sun.star.drawing. xGraphicExportFilter = xMCF.createInstanceWithContext("com.sun.star.drawing.GraphicsExportFilter", xContext);
+            int secs = 10;
+            int msecs = secs * 1000;
+
+            System.out.println("About to sleep for " + secs + " seconds!");
+            Thread.sleep(msecs);
+
+            System.out.println("Back from our nap!  Disposing of the file now.");
+            xComp.dispose();
+        } catch (java.lang.Exception e) {
+            e.printStackTrace();
+        } finally {
+            System.exit(0);
+        }
+    }
+
+    public static void enumeratePageImages(com.sun.star.lang.XComponent xComp,
+            com.sun.star.drawing.XDrawPage xDP) {
+        XGalleryThemeProvider xGTP =
+                (XGalleryThemeProvider) UnoRuntime.queryInterface(XGalleryThemeProvider.class, xComp);
+        if (xGTP == null) {
+            System.out.println("Failed to get XGalleryThemeProvider from xDrawPage");
+            return;
+        }
+
+    }
+
+
+    public static void printDocumentType(XComponentContext xContext,
+            com.sun.star.lang.XMultiComponentFactory xMCF, String sURL)
+    {
+        Object oInterface = null;
+
+        try {
+            oInterface = xMCF.createInstanceWithContext(
+                    "com.sun.star.document.TypeDetection", xContext);
+        } catch (java.lang.Exception ex) {
+            ex.printStackTrace();
+        }
+
+        if(oInterface == null) {
+              System.err.println("__FUNCTION__: unable to create TypeDetection service");
+        }
+
+        XTypeDetection m_xDetection = (XTypeDetection)
+                UnoRuntime.queryInterface(XTypeDetection.class, oInterface);
+
+        // queryTypeByURL does a "flat" detection of filetype (looking at the suffix???)
+        System.out.println("queryTypeByURL says '"
+                + sURL + "' is of type: '" +
+                m_xDetection.queryTypeByURL(sURL) +"'");
+
+        // queryTypeByDescriptor does an optional "deep" detection of filetype
+        PropertyValue testProps[][] = new PropertyValue[1][1];
+        testProps[0][0] = new PropertyValue();
+        testProps[0][0].Name = "URL";
+        testProps[0][0].Value = sURL;
+
+        System.out.println("queryTypeByDescriptor says '" +
+                sURL + "' is of type: '" +
+                m_xDetection.queryTypeByDescriptor(testProps, false) +"'");
+
+    }
+
+
+    public static com.sun.star.drawing.XShape createShape(
+        com.sun.star.lang.XComponent xDocComp, int height, int width, int x,
+        int y, String kind, int col)
+    {
+        //possible values for kind are 'Ellipse', 'Line' and 'Rectangle'
+        com.sun.star.awt.Size size = new com.sun.star.awt.Size();
+        com.sun.star.awt.Point position = new com.sun.star.awt.Point();
+        com.sun.star.drawing.XShape xShape = null;
+
+        //get MSF
+        com.sun.star.lang.XMultiServiceFactory xDocMSF =
+            (com.sun.star.lang.XMultiServiceFactory) UnoRuntime.queryInterface(
+                com.sun.star.lang.XMultiServiceFactory.class, xDocComp );
+
+        try {
+            Object oInt = xDocMSF.createInstance("com.sun.star.drawing."
+                                                 +kind + "Shape");
+            xShape = (com.sun.star.drawing.XShape)UnoRuntime.queryInterface(
+                com.sun.star.drawing.XShape.class, oInt);
+            size.Height = height;
+            size.Width = width;
+            position.X = x;
+            position.Y = y;
+            xShape.setSize(size);
+            xShape.setPosition(position);
+
+        } catch ( Exception e ) {
+            System.err.println( "Couldn't create instance "+ e );
+            e.printStackTrace(System.err);
+        }
+
+        com.sun.star.beans.XPropertySet xSPS = (com.sun.star.beans.XPropertySet)
+            UnoRuntime.queryInterface(
+                com.sun.star.beans.XPropertySet.class, xShape);
+
+        try {
+            xSPS.setPropertyValue("FillColor", new Integer(col));
+        } catch (Exception e) {
+            System.err.println("Can't change colors " + e);
+            e.printStackTrace(System.err);
+        }
+
+        return xShape;
+    }
+
+    public static com.sun.star.drawing.XShape createSequence(
+        com.sun.star.lang.XComponent xDocComp, com.sun.star.drawing.XDrawPage xDP)
+    {
+        com.sun.star.awt.Size size = new com.sun.star.awt.Size();
+        com.sun.star.awt.Point position = new com.sun.star.awt.Point();
+        com.sun.star.drawing.XShape xShape = null;
+        com.sun.star.drawing.XShapes xShapes = (com.sun.star.drawing.XShapes)
+            UnoRuntime.queryInterface(com.sun.star.drawing.XShapes.class, xDP);
+        int height = 3000;
+        int width = 3500;
+        int x = 1900;
+        int y = 20000;
+        Object oInt = null;
+        int r = 40;
+        int g = 0;
+        int b = 80;
+
+        //get MSF
+        com.sun.star.lang.XMultiServiceFactory xDocMSF =
+            (com.sun.star.lang.XMultiServiceFactory)UnoRuntime.queryInterface(
+                com.sun.star.lang.XMultiServiceFactory.class, xDocComp );
+
+        for (int i=0; i<370; i=i+25) {
+            try{
+                oInt = xDocMSF.createInstance("com.sun.star.drawing.EllipseShape");
+                xShape = (com.sun.star.drawing.XShape)UnoRuntime.queryInterface(
+                    com.sun.star.drawing.XShape.class, oInt);
+                size.Height = height;
+                size.Width = width;
+                position.X = (x+(i*40));
+                position.Y =
+                    (new Float(y+(Math.sin((i*Math.PI)/180))*5000)).intValue();
+                xShape.setSize(size);
+                xShape.setPosition(position);
+
+            } catch ( Exception e ) {
+                // Some exception occures.FAILED
+                System.err.println( "Couldn't get Shape "+ e );
+                e.printStackTrace(System.err);
+            }
+
+            b=b+8;
+
+            com.sun.star.beans.XPropertySet xSPS = (com.sun.star.beans.XPropertySet)
+                UnoRuntime.queryInterface(com.sun.star.beans.XPropertySet.class,
+                                          xShape);
+
+            try {
+                xSPS.setPropertyValue("FillColor", new Integer(getCol(r,g,b)));
+                xSPS.setPropertyValue("Shadow", new Boolean(true));
+            } catch (Exception e) {
+                System.err.println("Can't change colors " + e);
+                e.printStackTrace(System.err);
+            }
+            xShapes.add(xShape);
+        }
+
+        com.sun.star.drawing.XShapeGrouper xSGrouper =
+            (com.sun.star.drawing.XShapeGrouper)UnoRuntime.queryInterface(
+                com.sun.star.drawing.XShapeGrouper.class, xDP);
+
+        xShape = xSGrouper.group(xShapes);
+
+        return xShape;
+    }
+
+    public static int getCol(int r, int g, int b) {
+        return r*65536+g*256+b;
+    }
+
+}
