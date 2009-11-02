@@ -7,6 +7,7 @@
 
 package edu.umich.med.umms;
 
+import edu.umich.med.umms.OOoFormat;
 import java.awt.Frame;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -105,10 +106,59 @@ import com.sun.star.util.XSearchable;
  */
 public class OpenOfficeUNODecomposition {
 
+        public static final OOoFormat[] SUPPORTED_FORMATS = {
+            OOoFormat.OpenDocument_Text,OOoFormat.Microsoft_Word_97_2000_XP,
+            OOoFormat.Microsoft_Word_95,OOoFormat.Microsoft_Word_60,OOoFormat.Rich_Text_Format,
+     //       OOoFormat.Microsoft_Excel_97_2000_XP,
+     //       OOoFormat.Microsoft_Excel_95,OOoFormat.Microsoft_Excel_50,OOoFormat.OpenDocument_Spreadsheet,
+     //       OOoFormat.OpenOfficeorg_10_Spreadsheet,OOoFormat.Text_CSV,
+            OOoFormat.Microsoft_PowerPoint_97_2000_XP,OOoFormat.OpenOfficeorg_10_Presentation,
+            OOoFormat.OpenDocument_Presentation};
+
     /** Creates a new instance of OpenOfficeUNODecomposition */
     public OpenOfficeUNODecomposition() {
     }
 
+
+    private static XComponent openFileForProcessing(XDesktop xDesktop, String inputFile)
+    {
+        // Set up to load the document
+        PropertyValue propertyValues[] = new PropertyValue[3];
+        propertyValues[0] = new PropertyValue();
+        propertyValues[0].Name = "Hidden";
+        propertyValues[0].Value = new Boolean(false);
+
+        propertyValues[1] = new PropertyValue();
+        propertyValues[1].Name = "ReadOnly";
+        propertyValues[1].Value = new Boolean(true);
+
+        propertyValues[2] = new PropertyValue();
+        propertyValues[2].Name = "FilterName";
+        propertyValues[2].Value = new String("pdf_Portable_Document_Format");
+
+//            String sFileName = "/Users/kwc/Downloads/OER/2009-civic-sedan-brochure-OO-modified.odg";
+//            String sFileName = "/Users/kwc/Downloads/OER/2009-civic-sedan-brochure.pdf";
+//            String sFileName = "/Users/kwc/Downloads/OER/2009-civic-sedan-brochure.reallyapdf";
+
+        // Load the document
+        //System.out.print("Opening file '" + sFileName + "' ... ");
+        String sFileUrl = fileNameToOOoURL(inputFile);
+
+        XComponentLoader xCompLoader = (XComponentLoader)
+                UnoRuntime.queryInterface(XComponentLoader.class, xDesktop);
+
+
+        XComponent xCompDoc = null;
+        try {
+            xCompDoc = xCompLoader.loadComponentFromURL(
+                sFileUrl, "_blank", 0, propertyValues);
+        } catch (java.lang.Exception e) {
+            System.out.printf("Failed to open file '%s', error was '%s'\n",
+                    inputFile, e.getMessage());
+            System.exit(2);
+        }
+        return xCompDoc;
+    }
 
     /**
      * @param args the command line arguments
@@ -116,6 +166,7 @@ public class OpenOfficeUNODecomposition {
     public static void main(String[] args)
     {
         XComponentContext xContext = null;
+        String temporaryURL;
 
         if (args.length < 2) {
             System.out.printf("You must specify an input file and an output directory!\n");
@@ -146,46 +197,34 @@ public class OpenOfficeUNODecomposition {
                     xMCF.createInstanceWithContext("com.sun.star.frame.Desktop",
                     xContext));
 
-            XComponentLoader xCompLoader = (XComponentLoader) UnoRuntime.queryInterface(
-                    XComponentLoader.class, xDesktop);
+//            String sInFileName = args[0];
 
+            String inputName = args[0];
+            String outputDirectory = args[1];
+            String sFileUrl = fileNameToOOoURL(inputName);
 
-            // Set up to load the document
-            PropertyValue propertyValues[] = new PropertyValue[3];
-            propertyValues[0] = new PropertyValue();
-            propertyValues[0].Name = "Hidden";
-            propertyValues[0].Value = new Boolean(false);
-
-            propertyValues[1] = new PropertyValue();
-            propertyValues[1].Name = "ReadOnly";
-            propertyValues[1].Value = new Boolean(true);
-
-            propertyValues[2] = new PropertyValue();
-            propertyValues[2].Name = "FilterName";
-            propertyValues[2].Value = new String("pdf_Portable_Document_Format");
-
-//            String sFileName = "/Users/kwc/Downloads/OER/2009-civic-sedan-brochure-OO-modified.odg";
-//            String sFileName = "/Users/kwc/Downloads/OER/2009-civic-sedan-brochure.pdf";
-//            String sFileName = "/Users/kwc/Downloads/OER/2009-civic-sedan-brochure.reallyapdf";
-            String sInFileName = args[0];
-            String sOutDirName = args[1];
-
-            String sFileUrl = fileNameToOOoURL(sInFileName);
-
-            // print document type
-            printDocumentType(xContext, xMCF, sFileUrl);
-
-            // Load a document
-            //System.out.print("Opening file '" + sFileName + "' ... ");
-            XComponent xCompDoc = null;
-            try {
-                xCompDoc = xCompLoader.loadComponentFromURL(
-                    sFileUrl, "_blank", 0, propertyValues);
-            } catch (java.lang.Exception e) {
-                System.out.printf("Failed to open file '%s', error was '%s'\n",
-                        sInFileName, e.getMessage());
-                System.exit(2);
+            XComponent xCompDoc = openFileForProcessing(xDesktop, inputName);
+            if (xCompDoc == null) {
+                System.out.printf("Unable to open original file '%s', aborting!\n", inputName);
+                System.exit(3);
             }
+
+            String newName = possiblyUseTemporaryDocument(xContext, xMCF, xCompDoc, inputName);
+            if (newName != null) {
+                xCompDoc.dispose();
+                inputName = newName;
+                xCompDoc = openFileForProcessing(xDesktop, newName);
+                if (xCompDoc == null) {
+                    System.out.printf("Unable to open temporary file '%s', aborting!\n", newName);
+                    System.exit(3);
+                }
+            }
+
+//            System.out.printf("Original file '%s' has type '%s'\n",
+//                    inputName, getDocumentType(xContext, xMCF, sFileUrl));
+            // print document type
+//            printDocumentType(xContext, xMCF, sFileUrl);
+
 
             printSupportedServices(xCompDoc);
 
@@ -209,34 +248,34 @@ public class OpenOfficeUNODecomposition {
             }
  */
 
-            XSearchable xSearchable = (XSearchable) UnoRuntime.queryInterface(XSearchable.class, xCompDoc);
+//            XSearchable xSearchable = (XSearchable) UnoRuntime.queryInterface(XSearchable.class, xCompDoc);
 
-            if (xSearchable == null) {
-                System.out.println("No XSearchable here!");
-                //System.exit(22);
-            }
+//            if (xSearchable == null) {
+//                System.out.println("No XSearchable here!");
+//                //System.exit(22);
+//            }
 
             // Query for the XTextDocument interface
             XTextDocument xTextDoc =
                     (XTextDocument) UnoRuntime.queryInterface(XTextDocument.class, xCompDoc);
             if (xTextDoc != null) {
-//                handleTextDocument(xContext, xMCF, xCompDoc, xTextDoc, sOutDirName);
+//                handleTextDocument(xContext, xMCF, xCompDoc, xTextDoc, outputDirectory);
 
 //                XDrawPageSupplier xDrawPageSuppl =
 //                    (XDrawPageSupplier) UnoRuntime.queryInterface(XDrawPageSupplier.class, xCompDoc);
 //                if (xDrawPageSuppl != null) {
-//                    handleTextDrawDocument(xContext, xMCF, xCompDoc, xDrawPageSuppl, sOutDirName);
+//                    handleTextDrawDocument(xContext, xMCF, xCompDoc, xDrawPageSuppl, outputDirectory);
 //                } else {
 //                    System.out.println("The text document does not have images?");
 //                }
 
-                handleTextDocumentImages(xContext, xMCF, xCompDoc, xTextDoc, sOutDirName);
+                handleTextDocumentImages(xContext, xMCF, xCompDoc, xTextDoc, outputDirectory);
             } else {
                 XDrawPagesSupplier xDrawPagesSuppl =
                     (XDrawPagesSupplier) UnoRuntime.queryInterface(XDrawPagesSupplier.class, xCompDoc);
                 if (xDrawPagesSuppl != null) {
                     handleTextDocumentImages2(xContext, xMCF, xCompDoc, null, "/tmp/kwc-hack");
-//                    handleDrawDocument(xContext, xMCF, xCompDoc, xDrawPagesSuppl, sOutDirName);
+//                    handleDrawDocument(xContext, xMCF, xCompDoc, xDrawPagesSuppl, outputDirectory);
                 } else {
                     System.out.println("We don't know how to process this document type!");
                     exitCode = 45;
@@ -254,7 +293,7 @@ public class OpenOfficeUNODecomposition {
             System.out.println("Back from our nap!  Disposing of the file now.");
  */
             System.out.println("Saving modified document to a new file");
-            storeDocument(xMCF, xContext, xCompDoc, "/Users/kwc/modifiedfiles/foobar.doc");
+//            storeDocument(xContext, xMCF, xCompDoc, "/Users/kwc/modifiedfiles/foobar.doc");
             System.out.println("We be done.");
             xCompDoc.dispose();
         } catch (java.lang.Exception e) {
@@ -361,8 +400,8 @@ public class OpenOfficeUNODecomposition {
                                 UnoRuntime.queryInterface(XShape.class, xGOnames.getByName(name));
                         printShapeProperties(graphicShape);
 //                        int replaceResult = replaceTextDocImage(xContext, xMCF, xCompDoc, xTextDoc, name, new String("file:///Users/kwc/Private/Pictures/Dogs/Haley-01.jpg"));
-//                        exportImage(xMCF, xContext, graphicShape, outputDir, 0, i);
-//                        storeImage(xMCF, xContext, xTextDoc, graphicShape, outputDir, 0, i);
+//                        exportImage(xContext, xMCF, graphicShape, outputDir, 0, i);
+//                        storeImage(xContext, xMCF, xTextDoc, graphicShape, outputDir, 0, i);
                     } catch (NoSuchElementException ex) {
                         Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
                     } catch (WrappedTargetException ex) {
@@ -603,7 +642,7 @@ private static void exportEmbeddedGraphics(XComponentContext xContext,
             XDrawPage xDrawPage = xDrawPageSuppl.getDrawPage();
             Object firstPage = xDrawPage.getByIndex(0);
 
-            exportContextImage(xMCF, xContext, xDrawPage, outputDir, 1);
+            exportContextImage(xContext, xMCF, xDrawPage, outputDir, 1);
             int pageCount = xDrawPage.getCount();
             System.out.printf("xDrawPage.getCount returned a value of '%d' pages\n", pageCount);
             XDrawPage currPage = null;
@@ -619,7 +658,7 @@ private static void exportEmbeddedGraphics(XComponentContext xContext,
                     System.exit(22);
                 }
                 System.out.printf("=== Working with page %d ===\n", p + 1);
-                exportContextImage(xMCF, xContext, currPage, outputDir, p + 1);
+                exportContextImage(xContext, xMCF, currPage, outputDir, p + 1);
 
                 int numShapes = currPage.getCount();
                 System.out.printf("Page %d has %d shapes\n", p + 1, numShapes);
@@ -643,19 +682,19 @@ private static void exportEmbeddedGraphics(XComponentContext xContext,
                     if (currType.equalsIgnoreCase("com.sun.star.drawing.GraphicObjectShape")) {
                         System.out.printf("Handling GraphicObjectShape (%d) on page %d\n", s + 1, p + 1);
                         //System.out.printf("The URL for this shape is '%s'", currPropSet.getPropertyValue("GraphicURL"));
-                        exportImage(xMCF, xContext, currShape, outputDir, p + 1, s + 1);
+                        exportImage(xContext, xMCF, currShape, outputDir, p + 1, s + 1);
                     } else if (currType.equalsIgnoreCase("com.sun.star.drawing.TableShape")) {
                         System.out.printf("Handling TableShape (%d) on page %d\n", s + 1, p + 1);
                         //System.out.printf("The URL for this shape is '%s'", currPropSet.getPropertyValue("GraphicURL"));
-                        exportImage(xMCF, xContext, currShape, outputDir, p + 1, s + 1);
+                        exportImage(xContext, xMCF, currShape, outputDir, p + 1, s + 1);
                     } else if (currType.equalsIgnoreCase("com.sun.star.drawing.GroupShape")) {
                         System.out.printf("Handling GroupShape (%d) on page %d\n", s + 1, p + 1);
                         //System.out.printf("The URL for this shape is '%s'", currPropSet.getPropertyValue("GraphicURL"));
-                        exportImage(xMCF, xContext, currShape, outputDir, p + 1, s + 1);
+                        exportImage(xContext, xMCF, currShape, outputDir, p + 1, s + 1);
                     } else if (currType.equalsIgnoreCase("com.sun.star.drawing.CustomShape")) {
                         System.out.printf("Handling CustomShape (%d) on page %d\n", s + 1, p + 1);
                         //System.out.printf("The URL for this shape is '%s'", currPropSet.getPropertyValue("GraphicURL"));
-                        handleCustomShape(xMCF, xContext, currShape, outputDir, p + 1, s + 1);
+                        handleCustomShape(xContext, xMCF, currShape, outputDir, p + 1, s + 1);
                     } else {
                         System.out.printf("SKIPPING %s (%d) on page %d\n", currType, s + 1, p + 1);
                     }
@@ -835,7 +874,7 @@ private static void exportEmbeddedGraphics(XComponentContext xContext,
                     System.exit(22);
                 }
                 System.out.printf("=== Working with page %d ===\n", p + 1);
-                exportContextImage(xMCF, xContext, currPage, outputDir, p + 1);
+                exportContextImage(xContext, xMCF, currPage, outputDir, p + 1);
 
                 int numShapes = currPage.getCount();
                 System.out.printf("Page %d has %d shapes\n", p + 1, numShapes);
@@ -859,31 +898,31 @@ private static void exportEmbeddedGraphics(XComponentContext xContext,
                     if (currType.equalsIgnoreCase("com.sun.star.drawing.GraphicObjectShape")) {
                         System.out.printf("Handling GraphicObjectShape (%d) on page %d\n", s + 1, p + 1);
                         //System.out.printf("The URL for this shape is '%s'", currPropSet.getPropertyValue("GraphicURL"));
-                        exportImage(xMCF, xContext, currShape, outputDir, p + 1, s + 1);
+                        exportImage(xContext, xMCF, currShape, outputDir, p + 1, s + 1);
                     } else if (currType.equalsIgnoreCase("com.sun.star.drawing.TableShape")) {
                         System.out.printf("Handling TableShape (%d) on page %d\n", s + 1, p + 1);
                         //System.out.printf("The URL for this shape is '%s'", currPropSet.getPropertyValue("GraphicURL"));
-                        exportImage(xMCF, xContext, currShape, outputDir, p + 1, s + 1);
+                        exportImage(xContext, xMCF, currShape, outputDir, p + 1, s + 1);
                     } else if (currType.equalsIgnoreCase("com.sun.star.drawing.GroupShape")) {
                         System.out.printf("Handling GroupShape (%d) on page %d\n", s + 1, p + 1);
                         //System.out.printf("The URL for this shape is '%s'", currPropSet.getPropertyValue("GraphicURL"));
-                        exportImage(xMCF, xContext, currShape, outputDir, p + 1, s + 1);
+                        exportImage(xContext, xMCF, currShape, outputDir, p + 1, s + 1);
                     } else if (currType.equalsIgnoreCase("com.sun.star.drawing.CustomShape")) {
                         System.out.printf("Handling CustomShape (%d) on page %d\n", s + 1, p + 1);
                         //System.out.printf("The URL for this shape is '%s'", currPropSet.getPropertyValue("GraphicURL"));
-                        handleCustomShape(xMCF, xContext, currShape, outputDir, p + 1, s + 1);
+                        handleCustomShape(xContext, xMCF, currShape, outputDir, p + 1, s + 1);
 /*                    } else if (currType.equalsIgnoreCase("com.sun.star.presentation.TitleTextShape")) {
                         System.out.printf("Handling TitleTextShape (%d) on page %d\n", s + 1, p + 1);
                         //System.out.printf("The URL for this shape is '%s'", currPropSet.getPropertyValue("GraphicURL"));
-                        exportImage(xMCF, xContext, currShape, outputDir, p + 1, s + 1);
+                        exportImage(xContext, xMCF, currShape, outputDir, p + 1, s + 1);
                     } else if (currType.equalsIgnoreCase("com.sun.star.presentation.OutlinerShape")) {
                         System.out.printf("Handling OutlinerShape (%d) on page %d\n", s + 1, p + 1);
                         //System.out.printf("The URL for this shape is '%s'", currPropSet.getPropertyValue("GraphicURL"));
-                        exportImage(xMCF, xContext, currShape, outputDir, p + 1, s + 1);
+                        exportImage(xContext, xMCF, currShape, outputDir, p + 1, s + 1);
                     } else if (currType.equalsIgnoreCase("com.sun.star.drawing.LineShape")) {
                         System.out.printf("SKIPPING LineShape (%d) on page %d\n", s + 1, p + 1);
                         //System.out.printf("The URL for this shape is '%s'", currPropSet.getPropertyValue("GraphicURL"));
-                        exportImage(xMCF, xContext, currShape, outputDir, p + 1, s + 1);
+                        exportImage(xContext, xMCF, currShape, outputDir, p + 1, s + 1);
 */
                     } else {
                         System.out.printf("SKIPPING %s (%d) on page %d\n", currType, s + 1, p + 1);
@@ -985,11 +1024,11 @@ private static void exportEmbeddedGraphics(XComponentContext xContext,
             }
     }
 
-    private static void exportContextImage(XMultiComponentFactory xMCF,
-                                          XComponentContext xContext,
-                                          XDrawPage page,
-                                          String outputDir,
-                                          int p)
+    private static void exportContextImage(XComponentContext xContext,
+                                           XMultiComponentFactory xMCF,
+                                           XDrawPage page,
+                                           String outputDir,
+                                           int p)
     {
 
         XPropertySet shapeProps = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, page);
@@ -1033,12 +1072,12 @@ private static void exportEmbeddedGraphics(XComponentContext xContext,
     }
 
 
-    private static void exportImage(XMultiComponentFactory xMCF,
-                                   XComponentContext xContext,
-                                   XShape shape,
-                                   String outputDir,
-                                   int p,
-                                   int s)
+    private static void exportImage(XComponentContext xContext,
+                                    XMultiComponentFactory xMCF,
+                                    XShape shape,
+                                    String outputDir,
+                                    int p,
+                                    int s)
     {
 
         XPropertySet shapeProps = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, shape);
@@ -1084,8 +1123,8 @@ private static void exportEmbeddedGraphics(XComponentContext xContext,
         }
     }
 
-    private static void storeImage(XMultiComponentFactory xMCF,
-                                   XComponentContext xContext,
+    private static void storeImage(XComponentContext xContext,
+                                   XMultiComponentFactory xMCF,
                                    XComponent xCompDoc,
                                    XShape xShape,
                                    String outputDir,
@@ -1140,12 +1179,12 @@ private static void exportEmbeddedGraphics(XComponentContext xContext,
     }*/
 
     
-    private static void handleCustomShape(XMultiComponentFactory xMCF,
-                                         XComponentContext xContext,
-                                         XShape shape,
-                                         String outputDir,
-                                         int p,
-                                         int s)
+    private static void handleCustomShape(XComponentContext xContext,
+                                          XMultiComponentFactory xMCF,
+                                          XShape shape,
+                                          String outputDir,
+                                          int p,
+                                          int s)
     {
         try {
             printShapeProperties(shape);
@@ -1223,7 +1262,8 @@ private static void exportEmbeddedGraphics(XComponentContext xContext,
 */
 
     private static void printDocumentType(XComponentContext xContext,
-            com.sun.star.lang.XMultiComponentFactory xMCF, String sURL)
+                                          XMultiComponentFactory xMCF,
+                                          String sURL)
     {
         Object oInterface = null;
 
@@ -1258,16 +1298,48 @@ private static void exportEmbeddedGraphics(XComponentContext xContext,
 
     }
 
+    private static String getDocumentType(XComponentContext xContext,
+                                          XMultiComponentFactory xMCF,
+                                          String sURL)
+    {
+        Object oInterface = null;
+
+        try {
+            oInterface = xMCF.createInstanceWithContext(
+                    "com.sun.star.document.TypeDetection", xContext);
+        } catch (java.lang.Exception ex) {
+            ex.printStackTrace();
+        }
+
+        if(oInterface == null) {
+              System.err.println("__FUNCTION__: unable to create TypeDetection service");
+              return null;
+        }
+
+        XTypeDetection m_xDetection = (XTypeDetection)
+                UnoRuntime.queryInterface(XTypeDetection.class, oInterface);
+
+        // do the optional "deep" detection of filetype
+        PropertyValue testProps[][] = new PropertyValue[1][1];
+        testProps[0][0] = new PropertyValue();
+        testProps[0][0].Name = "URL";
+        testProps[0][0].Value = sURL;
+
+        return m_xDetection.queryTypeByDescriptor(testProps, true);
+    }
+
     private static String fileNameToOOoURL(final String fName) {
         StringBuilder sLoadUrl = new StringBuilder("file://");
         sLoadUrl.append(fName.replace('\\', '/'));
         return sLoadUrl.toString();
     }
 
-    private static void storeDocument(XMultiComponentFactory xMCF,
-                                     XComponentContext xContext,
-                                     XComponent xCompDoc,
-                                     String newFName) {
+    private static void storeDocument(XComponentContext xContext,
+                                      XMultiComponentFactory xMCF,
+                                      XComponent xCompDoc,
+                                      String newFName,
+                                      String filterName)
+    {
         String newFNameURL = fileNameToOOoURL(newFName);
         System.out.printf("Storing to '%s' using URL '%s'\n", newFName, newFNameURL);
 
@@ -1278,7 +1350,7 @@ private static void exportEmbeddedGraphics(XComponentContext xContext,
         propertyValue[2].Value = Boolean.valueOf(true);
         propertyValue[0] = new com.sun.star.beans.PropertyValue();
         propertyValue[0].Name = "FilterName";
-        propertyValue[0].Value = "MOOX";    // MS Word 97"; //destinationFormats.getFilterName();
+        propertyValue[0].Value = filterName; // "MS Word 97"; // "MOOX"; //destinationFormats.getFilterName();
 //        propertyValue[2] = new PropertyValue();
 //        propertyValue[2].Value = "AsTemplate";
 //        propertyValue[2].Value = Boolean.valueOf(true);
@@ -1294,6 +1366,53 @@ private static void exportEmbeddedGraphics(XComponentContext xContext,
             ex.printStackTrace();
         }
 
+    }
+
+    private static boolean isaSupportedFormat(OOoFormat format)
+    {
+        return (java.util.Arrays.asList(SUPPORTED_FORMATS).contains(format));
+    }
+
+    private static OOoFormat getNativeFormat(OOoFormat origFormat)
+    {
+        OOoFormat nativeFormat = origFormat;
+
+        if (origFormat.getHandlerType() == 0) {
+            nativeFormat = OOoFormat.OpenDocument_Text;
+        } else if (origFormat.getHandlerType() == 2) {
+            nativeFormat = OOoFormat.OpenDocument_Presentation;
+        }
+        return nativeFormat;
+    }
+
+    private static String possiblyUseTemporaryDocument(XComponentContext xContext,
+                                               XMultiComponentFactory xMCF,
+                                               XComponent xCompOrigDoc,
+                                               String origName)
+    {
+        String newName;
+        String origUrl = fileNameToOOoURL(origName);
+        String origType = getDocumentType(xContext, xMCF, origUrl);
+
+        OOoFormat origFormat = OOoFormat.findFormatWithDocumentType(origType);
+        OOoFormat nativeFormat;
+
+        if (origFormat == null || !isaSupportedFormat(origFormat)) {
+            return null;
+        }
+
+        // If already in OO format, no need
+        if ((nativeFormat = getNativeFormat(origFormat)) == null) {
+            return null;
+        }
+
+        newName = "/tmp/foobar_thisshouldberandom_" + "xyz123" + "." + nativeFormat.getFileExtension();
+
+        // Save in OO format and return the name of the temporary file
+        storeDocument(xContext, xMCF, xCompOrigDoc, newName, nativeFormat.getFilterName());
+        // Get current file type and determine if we need to save it in OO format
+
+        return newName;
     }
 
     /*
