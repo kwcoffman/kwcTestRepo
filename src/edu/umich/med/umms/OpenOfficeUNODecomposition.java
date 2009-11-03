@@ -132,9 +132,9 @@ public class OpenOfficeUNODecomposition {
         propertyValues[1].Name = "ReadOnly";
         propertyValues[1].Value = new Boolean(true);
 
-        propertyValues[2] = new PropertyValue();
-        propertyValues[2].Name = "FilterName";
-        propertyValues[2].Value = new String("pdf_Portable_Document_Format");
+//        propertyValues[2] = new PropertyValue();
+//        propertyValues[2].Name = "FilterName";
+//        propertyValues[2].Value = new String("pdf_Portable_Document_Format");
 
 //            String sFileName = "/Users/kwc/Downloads/OER/2009-civic-sedan-brochure-OO-modified.odg";
 //            String sFileName = "/Users/kwc/Downloads/OER/2009-civic-sedan-brochure.pdf";
@@ -167,10 +167,11 @@ public class OpenOfficeUNODecomposition {
     {
         XComponentContext xContext = null;
         String temporaryURL;
+        OOoFormat fileFormat;
 
         if (args.length < 2) {
             System.out.printf("You must specify an input file and an output directory!\n");
-            System.exit(2);
+            System.exit(1);
         }
         for (int i = 0; i < args.length; i++) {
             System.out.printf("args[%d] is '%s'\n", i, args[i]);
@@ -182,7 +183,7 @@ public class OpenOfficeUNODecomposition {
             xContext = Bootstrap.bootstrap();
             if (xContext == null) {
                 System.err.println("ERROR: Couldn't connect to OpenOffice process.");
-                System.exit(1);
+                System.exit(2);
             }
             System.out.println("Successfully connected to OpenOffice process!");
 
@@ -200,7 +201,7 @@ public class OpenOfficeUNODecomposition {
 //            String sInFileName = args[0];
 
             String inputName = args[0];
-            String outputDirectory = args[1];
+            String outputDir = args[1];
             String sFileUrl = fileNameToOOoURL(inputName);
 
             XComponent xCompDoc = openFileForProcessing(xDesktop, inputName);
@@ -208,25 +209,55 @@ public class OpenOfficeUNODecomposition {
                 System.out.printf("Unable to open original file '%s', aborting!\n", inputName);
                 System.exit(3);
             }
+            printSupportedServices(xCompDoc);  // original
 
-            String newName = possiblyUseTemporaryDocument(xContext, xMCF, xCompDoc, inputName);
+            // Determine what kind of document it is and how to proceed
+            String fileType = getDocumentType(xContext, xMCF, sFileUrl);
+            fileFormat = OOoFormat.findFormatWithDocumentType(fileType);
+            if (!isaSupportedFormat(fileFormat)) {
+                System.out.printf("File '%s', format '%s', is not supported!\n",
+                        inputName, fileFormat.getFormatName());
+                xCompDoc.dispose();
+                System.exit(5);
+            }
+
+            // Possibly save original document as an OO document
+            String newName = possiblyUseTemporaryDocument(xContext, xMCF, xCompDoc, inputName, fileFormat);
             if (newName != null) {
                 xCompDoc.dispose();
                 inputName = newName;
                 xCompDoc = openFileForProcessing(xDesktop, newName);
                 if (xCompDoc == null) {
                     System.out.printf("Unable to open temporary file '%s', aborting!\n", newName);
-                    System.exit(3);
+                    System.exit(4);
                 }
             }
+            printSupportedServices(xCompDoc);   // possibly OO version
 
+            // Decide how to process the document
+            int handler = fileFormat.getHandlerType();
+            switch (handler) {
+                case 0:
+                    handleTextDocument(xContext, xMCF, xCompDoc, outputDir);
+                    break;
+                case 2:
+                    handlePresentationDocument(xContext, xMCF, xCompDoc, outputDir);
+                    break;
+                case 1:
+                    //handleSpreadsheetDocument(xContext, xMCF, xCompDoc);
+                    // Fall through for now
+                default:
+                    System.out.printf("File '%s', format '%s', is not supported!\n",
+                        inputName, fileFormat.getFormatName());
+                    xCompDoc.dispose();
+                    System.exit(6);
+            }
 //            System.out.printf("Original file '%s' has type '%s'\n",
 //                    inputName, getDocumentType(xContext, xMCF, sFileUrl));
             // print document type
 //            printDocumentType(xContext, xMCF, sFileUrl);
 
 
-            printSupportedServices(xCompDoc);
 
 /*
             com.sun.star.drawing.XDrawView xDrawView =
@@ -255,10 +286,6 @@ public class OpenOfficeUNODecomposition {
 //                //System.exit(22);
 //            }
 
-            // Query for the XTextDocument interface
-            XTextDocument xTextDoc =
-                    (XTextDocument) UnoRuntime.queryInterface(XTextDocument.class, xCompDoc);
-            if (xTextDoc != null) {
 //                handleTextDocument(xContext, xMCF, xCompDoc, xTextDoc, outputDirectory);
 
 //                XDrawPageSupplier xDrawPageSuppl =
@@ -268,7 +295,7 @@ public class OpenOfficeUNODecomposition {
 //                } else {
 //                    System.out.println("The text document does not have images?");
 //                }
-
+/*
                 handleTextDocumentImages(xContext, xMCF, xCompDoc, xTextDoc, outputDirectory);
             } else {
                 XDrawPagesSupplier xDrawPagesSuppl =
@@ -281,7 +308,7 @@ public class OpenOfficeUNODecomposition {
                     exitCode = 45;
                 }
             }
-
+*/
 
 /*
             int secs = 10;
@@ -292,7 +319,7 @@ public class OpenOfficeUNODecomposition {
 
             System.out.println("Back from our nap!  Disposing of the file now.");
  */
-            System.out.println("Saving modified document to a new file");
+            System.out.println("Saving (possibly) modified document to a new file");
 //            storeDocument(xContext, xMCF, xCompDoc, "/Users/kwc/modifiedfiles/foobar.doc");
             System.out.println("We be done.");
             xCompDoc.dispose();
@@ -306,9 +333,21 @@ public class OpenOfficeUNODecomposition {
     private static void handleTextDocument(XComponentContext xContext,
                                           XMultiComponentFactory xMCF,
                                           XComponent xCompDoc,
-                                          XTextDocument xTextDoc,
                                           String outputDir)
     {
+        // Query for the XTextDocument interface
+        XTextDocument xTextDoc =
+                    (XTextDocument) UnoRuntime.queryInterface(XTextDocument.class, xCompDoc);
+        if (xTextDoc == null) {
+            System.out.printf("Cannot get XTextDocument interface for Text Document???\n");
+            System.exit(7);
+        }
+
+        handleTextDocumentImages(xContext, xMCF, xCompDoc, xTextDoc, outputDir);
+        //handleTextDocumentImages2(xContext, xMCF, xCompDoc, xTextDoc, outputDir);
+        return;     // XXX XXX XXX XXX XXX
+
+/*
         // Querying for the interface XMultiServiceFactory on the xTextDoc
         XMultiServiceFactory xMSFDoc =
                 (XMultiServiceFactory) UnoRuntime.queryInterface(
@@ -334,6 +373,26 @@ public class OpenOfficeUNODecomposition {
             System.out.printf("The document text is:\n======================\n%s\n======================\n", t);
 
         }
+ */
+    }
+
+    private static void handlePresentationDocument(XComponentContext xContext,
+                                                   XMultiComponentFactory xMCF,
+                                                   XComponent xCompDoc,
+                                                   String outputDir)
+    {
+        // Query for the XDrawPagesSupplier interface
+        XDrawPagesSupplier xDrawPagesSuppl =
+                (XDrawPagesSupplier) UnoRuntime.queryInterface(XDrawPagesSupplier.class, xCompDoc);
+        if (xDrawPagesSuppl == null) {
+            System.out.printf("Cannot get XDrawPagesSupplier interface for Presentation Document???\n");
+            System.exit(8);
+        }
+
+
+        handleDrawDocument(xContext, xMCF, xCompDoc, xDrawPagesSuppl, outputDir);
+        return;
+
     }
 
     private static void handleTextDocumentImages(XComponentContext xContext,
@@ -375,6 +434,7 @@ public class OpenOfficeUNODecomposition {
                 Class objclass = xGOnames.getClass();
                 String[] graphicNames = xGOnames.getElementNames();
                 int numImages = graphicNames.length;
+                System.out.printf("There are %d GraphicObjects in this file\n", numImages);
                 /*
                 for (int i = 0; i < numImages; i++) {
                     try {
@@ -398,7 +458,12 @@ public class OpenOfficeUNODecomposition {
                         //Object graphicsObject = xGOnames.getByName(graphicNames[i]);
                         XShape graphicShape = (XShape)
                                 UnoRuntime.queryInterface(XShape.class, xGOnames.getByName(name));
-                        printShapeProperties(graphicShape);
+                        XPropertySet textProps = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, graphicShape);
+                        String pictureURL = textProps.getPropertyValue("GraphicURL").toString();
+                        pictureURL = pictureURL.substring(27);  // Chop off the leading "vnd.sun.star.GraphicObject:"
+                        String outName = constructBaseImageName(outputDir, 1, i);
+                        extractImageByURL(xContext, xMCF, xCompDoc, pictureURL, outName);
+//                        printShapeProperties(graphicShape);
 //                        int replaceResult = replaceTextDocImage(xContext, xMCF, xCompDoc, xTextDoc, name, new String("file:///Users/kwc/Private/Pictures/Dogs/Haley-01.jpg"));
 //                        exportImage(xContext, xMCF, graphicShape, outputDir, 0, i);
 //                        storeImage(xContext, xMCF, xTextDoc, graphicShape, outputDir, 0, i);
@@ -897,31 +962,34 @@ private static void exportEmbeddedGraphics(XComponentContext xContext,
 
                     if (currType.equalsIgnoreCase("com.sun.star.drawing.GraphicObjectShape")) {
                         System.out.printf("Handling GraphicObjectShape (%d) on page %d\n", s + 1, p + 1);
-                        //System.out.printf("The URL for this shape is '%s'", currPropSet.getPropertyValue("GraphicURL"));
-                        exportImage(xContext, xMCF, currShape, outputDir, p + 1, s + 1);
+//                        exportImage(xContext, xMCF, currShape, outputDir, p + 1, s + 1);
+                        XPropertySet textProps = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, currShape);
+                        String pictureURL = textProps.getPropertyValue("GraphicURL").toString();
+                        pictureURL = pictureURL.substring(27);  // Chop off the leading "vnd.sun.star.GraphicObject:"
+                        String outName = constructBaseImageName(outputDir, p+1, s+1);
+                        extractImageByURL(xContext, xMCF, xCompDoc, pictureURL, outName);
                     } else if (currType.equalsIgnoreCase("com.sun.star.drawing.TableShape")) {
                         System.out.printf("Handling TableShape (%d) on page %d\n", s + 1, p + 1);
-                        //System.out.printf("The URL for this shape is '%s'", currPropSet.getPropertyValue("GraphicURL"));
                         exportImage(xContext, xMCF, currShape, outputDir, p + 1, s + 1);
                     } else if (currType.equalsIgnoreCase("com.sun.star.drawing.GroupShape")) {
                         System.out.printf("Handling GroupShape (%d) on page %d\n", s + 1, p + 1);
-                        //System.out.printf("The URL for this shape is '%s'", currPropSet.getPropertyValue("GraphicURL"));
                         exportImage(xContext, xMCF, currShape, outputDir, p + 1, s + 1);
                     } else if (currType.equalsIgnoreCase("com.sun.star.drawing.CustomShape")) {
                         System.out.printf("Handling CustomShape (%d) on page %d\n", s + 1, p + 1);
-                        //System.out.printf("The URL for this shape is '%s'", currPropSet.getPropertyValue("GraphicURL"));
+//                        XPropertySet textProps = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, currShape);
+//                        String pictureURL = textProps.getPropertyValue("GraphicURL").toString();
+//                        pictureURL = pictureURL.substring(27);  // Chop off the leading "vnd.sun.star.GraphicObject:"
+//                        String outName = constructBaseImageName(outputDir, p+1, s+1);
+//                        extractImageByURL(xContext, xMCF, xCompDoc, pictureURL, outName);
                         handleCustomShape(xContext, xMCF, currShape, outputDir, p + 1, s + 1);
 /*                    } else if (currType.equalsIgnoreCase("com.sun.star.presentation.TitleTextShape")) {
                         System.out.printf("Handling TitleTextShape (%d) on page %d\n", s + 1, p + 1);
-                        //System.out.printf("The URL for this shape is '%s'", currPropSet.getPropertyValue("GraphicURL"));
                         exportImage(xContext, xMCF, currShape, outputDir, p + 1, s + 1);
                     } else if (currType.equalsIgnoreCase("com.sun.star.presentation.OutlinerShape")) {
                         System.out.printf("Handling OutlinerShape (%d) on page %d\n", s + 1, p + 1);
-                        //System.out.printf("The URL for this shape is '%s'", currPropSet.getPropertyValue("GraphicURL"));
                         exportImage(xContext, xMCF, currShape, outputDir, p + 1, s + 1);
                     } else if (currType.equalsIgnoreCase("com.sun.star.drawing.LineShape")) {
                         System.out.printf("SKIPPING LineShape (%d) on page %d\n", s + 1, p + 1);
-                        //System.out.printf("The URL for this shape is '%s'", currPropSet.getPropertyValue("GraphicURL"));
                         exportImage(xContext, xMCF, currShape, outputDir, p + 1, s + 1);
 */
                     } else {
@@ -956,6 +1024,8 @@ private static void exportEmbeddedGraphics(XComponentContext xContext,
         } catch (IndexOutOfBoundsException ex) {
             Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
         } catch (WrappedTargetException ex) {
+            Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (UnknownPropertyException ex) {
             Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
         }
 /*
@@ -1032,6 +1102,7 @@ private static void exportEmbeddedGraphics(XComponentContext xContext,
     {
 
         XPropertySet shapeProps = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, page);
+/*
         if (shapeProps != null) {
             try {
                 Object shapeURLObj = shapeProps.getPropertyValue("GraphicURL");
@@ -1039,9 +1110,10 @@ private static void exportEmbeddedGraphics(XComponentContext xContext,
 
             //System.out.printf("The URL for this shape is '%s'\n", shapeURL);
             } catch (Exception e) {
-                System.out.printf("Unable to get GraphicURL property for object: '%s'\n", e.getMessage());
+                System.out.printf("Unable to get GraphicURL property for context image: '%s'\n", e.getMessage());
             }
         }
+ */
         String fname = String.format("%s/%s-%05d.%s", outputDir, "contextimage", p, "png");
 
         PropertyValue outProps[] = new PropertyValue[2];
@@ -1187,8 +1259,8 @@ private static void exportEmbeddedGraphics(XComponentContext xContext,
                                           int s)
     {
         try {
+            System.out.println("handleCustomShape: currently does nothing!!");
             printShapeProperties(shape);
-            return;
         } catch (WrappedTargetException ex) {
             Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -1388,25 +1460,21 @@ private static void exportEmbeddedGraphics(XComponentContext xContext,
     private static String possiblyUseTemporaryDocument(XComponentContext xContext,
                                                XMultiComponentFactory xMCF,
                                                XComponent xCompOrigDoc,
-                                               String origName)
+                                               String origName,
+                                               OOoFormat origFormat)
     {
         String newName;
-        String origUrl = fileNameToOOoURL(origName);
-        String origType = getDocumentType(xContext, xMCF, origUrl);
-
-        OOoFormat origFormat = OOoFormat.findFormatWithDocumentType(origType);
         OOoFormat nativeFormat;
 
-        if (origFormat == null || !isaSupportedFormat(origFormat)) {
-            return null;
-        }
-
-        // If already in OO format, no need
+        // If already in Native OO format, no need to continue
         if ((nativeFormat = getNativeFormat(origFormat)) == null) {
             return null;
         }
+        if (nativeFormat == origFormat) {
+            return null;
+        }
 
-        newName = "/tmp/foobar_thisshouldberandom_" + "xyz123" + "." + nativeFormat.getFileExtension();
+        newName = new String("/tmp/foobar_thisshouldberandom_" + "xyz123" + "." + nativeFormat.getFileExtension());
 
         // Save in OO format and return the name of the temporary file
         storeDocument(xContext, xMCF, xCompOrigDoc, newName, nativeFormat.getFilterName());
@@ -1415,121 +1483,78 @@ private static void exportEmbeddedGraphics(XComponentContext xContext,
         return newName;
     }
 
-    /*
-    private static com.sun.star.drawing.XShape createShape(
-        com.sun.star.lang.XComponent xDocComp, int height, int width, int x,
-        int y, String kind, int col)
+    private static String getExtension(String fullName)
     {
-        //possible values for kind are 'Ellipse', 'Line' and 'Rectangle'
-        com.sun.star.awt.Size size = new com.sun.star.awt.Size();
-        com.sun.star.awt.Point position = new com.sun.star.awt.Point();
-        com.sun.star.drawing.XShape xShape = null;
-
-        //get MSF
-        XMultiServiceFactory xDocMSF =
-            (XMultiServiceFactory) UnoRuntime.queryInterface(
-                XMultiServiceFactory.class, xDocComp );
-
-        try {
-            Object oInt = xDocMSF.createInstance("com.sun.star.drawing."
-                                                 +kind + "Shape");
-            xShape = (com.sun.star.drawing.XShape)UnoRuntime.queryInterface(
-                com.sun.star.drawing.XShape.class, oInt);
-            size.Height = height;
-            size.Width = width;
-            position.X = x;
-            position.Y = y;
-            xShape.setSize(size);
-            xShape.setPosition(position);
-
-        } catch ( Exception e ) {
-            System.err.println( "Couldn't create instance "+ e );
-            e.printStackTrace(System.err);
-        }
-
-        com.sun.star.beans.XPropertySet xSPS = (com.sun.star.beans.XPropertySet)
-            UnoRuntime.queryInterface(
-                com.sun.star.beans.XPropertySet.class, xShape);
-
-        try {
-            xSPS.setPropertyValue("FillColor", new Integer(col));
-        } catch (Exception e) {
-            System.err.println("Can't change colors " + e);
-            e.printStackTrace(System.err);
-        }
-
-        return xShape;
+        int dotPos = fullName.lastIndexOf(".");
+        String strExtension = fullName.substring(dotPos + 1);
+        return strExtension;
+        //String strFilename = fullName.substring(0, dotPos);
     }
 
-    private static com.sun.star.drawing.XShape createSequence(
-        com.sun.star.lang.XComponent xDocComp, com.sun.star.drawing.XDrawPage xDP)
+    private static String constructBaseImageName(String dir, int page, int num)
     {
-        com.sun.star.awt.Size size = new com.sun.star.awt.Size();
-        com.sun.star.awt.Point position = new com.sun.star.awt.Point();
-        com.sun.star.drawing.XShape xShape = null;
-        com.sun.star.drawing.XShapes xShapes = (com.sun.star.drawing.XShapes)
-            UnoRuntime.queryInterface(com.sun.star.drawing.XShapes.class, xDP);
-        int height = 3000;
-        int width = 3500;
-        int x = 1900;
-        int y = 20000;
-        Object oInt = null;
-        int r = 40;
-        int g = 0;
-        int b = 80;
+        String outName = new String();
 
-        //get MSF
-        XMultiServiceFactory xDocMSF =
-            (XMultiServiceFactory)UnoRuntime.queryInterface(
-                XMultiServiceFactory.class, xDocComp );
+        outName = String.format("%s/image-%05d-%03d", dir, page, num);
+        return outName;
+    }
 
-        for (int i=0; i<370; i=i+25) {
-            try{
-                oInt = xDocMSF.createInstance("com.sun.star.drawing.EllipseShape");
-                xShape = (com.sun.star.drawing.XShape)UnoRuntime.queryInterface(
-                    com.sun.star.drawing.XShape.class, oInt);
-                size.Height = height;
-                size.Width = width;
-                position.X = (x+(i*40));
-                position.Y =
-                    (new Float(y+(Math.sin((i*Math.PI)/180))*5000)).intValue();
-                xShape.setSize(size);
-                xShape.setPosition(position);
+    private static void extractImageByURL(XComponentContext xContext,
+                                          XMultiComponentFactory xMCF,
+                                          XComponent xCompDoc,
+                                          String pictureURL,
+                                          String outName)
+    {
+        try {
+            Object oSFAcc = xMCF.createInstanceWithContext(
+                    "com.sun.star.ucb.SimpleFileAccess", xContext);
+            XSimpleFileAccess2 xFileWriter = (XSimpleFileAccess2)
+                    UnoRuntime.queryInterface(XSimpleFileAccess2.class, oSFAcc);
+            XStorageBasedDocument xStorageBasedDocument = (XStorageBasedDocument)
+                    UnoRuntime.queryInterface(XStorageBasedDocument.class, xCompDoc);
 
-            } catch ( Exception e ) {
-                // Some exception occures.FAILED
-                System.err.println( "Couldn't get Shape "+ e );
-                e.printStackTrace(System.err);
+            XStorage xDocStorage = xStorageBasedDocument.getDocumentStorage();
+            XStorage xDocPictures = (XStorage) UnoRuntime.queryInterface(
+                    XStorage.class, xDocStorage.getByName("Pictures"));
+
+            XNameAccess xDocStorageNameAccess = (XNameAccess)
+                    UnoRuntime.queryInterface(XNameAccess.class, xDocStorage);
+
+            String[] allNames = xDocStorageNameAccess.getElementNames();
+//            for (int i = 0; i < allNames.length; i++) {
+//                System.out.printf("The big list has name '%s'\n", allNames[i]);
+//            }
+
+            if (!xDocStorageNameAccess.hasByName("Pictures")) {
+                System.out.printf("Found no \"Pictures\" in the document!!!\n");
+                return;
             }
 
-            b=b+8;
+            Object oPicturesStorage = xDocStorageNameAccess.getByName("Pictures");
+            XNameAccess xPicturesNameAccess = (XNameAccess)
+                    UnoRuntime.queryInterface(XNameAccess.class, oPicturesStorage);
 
-            com.sun.star.beans.XPropertySet xSPS = (com.sun.star.beans.XPropertySet)
-                UnoRuntime.queryInterface(com.sun.star.beans.XPropertySet.class,
-                                          xShape);
+            String[] aNames = xPicturesNameAccess.getElementNames();
+            System.out.printf("There were a total of %d pictures found via DocStorageAccess\n", aNames.length);
+            for (int i = 0; i < aNames.length; i++) {
+                //System.out.printf("Picture %d has name '%s'\n", i+1, aNames[i]);
+                //System.out.printf("Processing picture with name '%s'\n", aNames[i]);
+                if (aNames[i].contains(pictureURL)) {
+                    Object oElement = xPicturesNameAccess.getByName(aNames[i]);
+                    XStream xStream = (XStream) UnoRuntime.queryInterface(XStream.class, oElement);
+                    Object oInput = xStream.getInputStream();
+                    XInputStream xInputStream = (XInputStream)
+                            UnoRuntime.queryInterface(XInputStream.class, oInput);
 
-            try {
-                xSPS.setPropertyValue("FillColor", new Integer(getCol(r,g,b)));
-                xSPS.setPropertyValue("Shadow", new Boolean(true));
-            } catch (Exception e) {
-                System.err.println("Can't change colors " + e);
-                e.printStackTrace(System.err);
+                    xFileWriter.writeFile(outName + "." + getExtension(aNames[i]), xInputStream);
+                    break;
+                }
+
             }
-            xShapes.add(xShape);
+        } catch (Exception ex) {
+            Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
+            return;
         }
 
-        com.sun.star.drawing.XShapeGrouper xSGrouper =
-            (com.sun.star.drawing.XShapeGrouper)UnoRuntime.queryInterface(
-                com.sun.star.drawing.XShapeGrouper.class, xDP);
-
-        xShape = xSGrouper.group(xShapes);
-
-        return xShape;
     }
-
-    private static int getCol(int r, int g, int b)
-    {
-        return r*65536+g*256+b;
-    }
-*/
 }
