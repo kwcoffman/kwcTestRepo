@@ -113,7 +113,7 @@ public class OpenOfficeUNODecomposition {
      //       OOoFormat.Microsoft_Excel_95,OOoFormat.Microsoft_Excel_50,OOoFormat.OpenDocument_Spreadsheet,
      //       OOoFormat.OpenOfficeorg_10_Spreadsheet,OOoFormat.Text_CSV,
             OOoFormat.Microsoft_PowerPoint_97_2000_XP,OOoFormat.OpenOfficeorg_10_Presentation,
-            OOoFormat.OpenDocument_Presentation};
+            OOoFormat.OpenDocument_Presentation, OOoFormat.Microsoft_PowerPoint_2007_XML};
 
         private static boolean ExcludeCustomShapes = false;
         private static boolean verbose = false;
@@ -238,7 +238,7 @@ public class OpenOfficeUNODecomposition {
             fileFormat = OOoFormat.findFormatWithDocumentType(fileType);
             if (!isaSupportedFormat(fileFormat)) {
                 System.out.printf("File '%s', format '%s', is not supported!\n",
-                        inputName, fileFormat.getFormatName());
+                        inputName, (fileFormat != null) ? fileFormat.getFormatName(): "<unknown>");
                 xCompDoc.dispose();
                 System.exit(5);
             }
