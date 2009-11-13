@@ -9,6 +9,7 @@ package edu.umich.med.umms;
 
 import edu.umich.med.umms.OOoFormat;
 import java.awt.Frame;
+import java.lang.Integer;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.InputStream;
@@ -18,6 +19,13 @@ import java.net.URL;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.apache.commons.cli.BasicParser;
+import org.apache.commons.cli.Options;
+import org.apache.commons.cli.OptionGroup;
+import org.apache.commons.cli.OptionBuilder;
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.HelpFormatter;
+import org.apache.commons.cli.ParseException;
 
 import com.sun.star.accessibility.XAccessible;
 import com.sun.star.accessibility.XAccessibleContext;
@@ -124,60 +132,35 @@ public class OpenOfficeUNODecomposition {
         OOoFormat.Microsoft_PowerPoint_2007_XML
     };
 
-    private static boolean ExcludeCustomShapes = false;
-    private static boolean ImageReplacement = false;
     private static boolean verbose = false;
+    private static boolean excludeCustomShapes = false;
+
+    private static boolean functionImageReplacement = false;
+    private static boolean functionExtractImages = false;
+    private static boolean functionCopyFile = false;
+    
+    private static final String Usage =
+            "[ --extract <options> | --replace <options> | --copy <options> ]\n\n" +
+            "Global options: [--verbose]\n\n" +
+            "--extract [ --exclude-custom-shapes ] --input <file> --output-dir <dir>\n\n" +
+            "--replace <options> --input <file> --newimage <file> --pagenum <pagenum> --imagenum <imagenum>\n\n" +
+            "--copy <options> --input <file> --output <file>\n";
+    
+    private static String inputName;
+    private static String outputName;
+    private static String outputDir;
+
+    private static int repPageNum = -1;
+    private static int repImageNum = -1;
+    private static String repImageFile;
+
+    private static OOoFormat origFileFormat = null;
+    private static OOoFormat ooFileFormat = null;
+    private static OOoFormat processFileFormat = null;
+
 
     /** Creates a new instance of OpenOfficeUNODecomposition */
     public OpenOfficeUNODecomposition() {
-    }
-
-
-    private static XComponent openFileForProcessing(XDesktop xDesktop, String inputFile)
-    {
-        // Set up to load the document
-        PropertyValue propertyValues[] = new PropertyValue[3];
-        propertyValues[0] = new PropertyValue();
-        propertyValues[0].Name = "Hidden";
-        propertyValues[0].Value = new Boolean(false);
-
-        propertyValues[1] = new PropertyValue();
-        propertyValues[1].Name = "ReadOnly";
-        propertyValues[1].Value = new Boolean(true);
-
-//        propertyValues[2] = new PropertyValue();
-//        propertyValues[2].Name = "FilterName";
-//        propertyValues[2].Value = new String("pdf_Portable_Document_Format");
-
-//            String sFileName = "/Users/kwc/Downloads/OER/2009-civic-sedan-brochure-OO-modified.odg";
-//            String sFileName = "/Users/kwc/Downloads/OER/2009-civic-sedan-brochure.pdf";
-//            String sFileName = "/Users/kwc/Downloads/OER/2009-civic-sedan-brochure.reallyapdf";
-
-        // Load the document
-        //System.out.print("Opening file '" + sFileName + "' ... ");
-        String sFileUrl = fileNameToOOoURL(inputFile);
-
-        XComponentLoader xCompLoader = (XComponentLoader)
-                UnoRuntime.queryInterface(XComponentLoader.class, xDesktop);
-
-
-        XComponent xCompDoc = null;
-        try {
-            xCompDoc = xCompLoader.loadComponentFromURL(
-                sFileUrl, "_blank", 0, propertyValues);
-        } catch (java.lang.Exception e) {
-            System.out.printf("Failed to open file '%s', error was '%s'\n",
-                    inputFile, e.getMessage());
-            System.exit(2);
-        }
-        return xCompDoc;
-    }
-
-    private static void PrintUsage()
-    {
-        System.out.println("Usage: [-xc] <input-file> <output-directory>");
-        System.exit(1);
-
     }
 
     /**
@@ -186,39 +169,15 @@ public class OpenOfficeUNODecomposition {
     public static void main(String[] args)
     {
         XComponentContext xContext = null;
-        OOoFormat origFileFormat = null;
-        OOoFormat ooFileFormat = null;
-        OOoFormat processFileFormat;
         String temporaryURL;
-        String inputName;
-        String outputDir;
+        Options opt = new Options();
+        int err;
 
-        if (verbose) {
-            for (int i = 0; i < args.length; i++) {
-                System.out.printf("args[%d] is '%s'\n", i, args[i]);
-            }
-        }
-        if (args.length < 2) {
-            PrintUsage();
-        }
-        if ((args[0]).equals("-xc")) {
-            if (args.length < 3) {
-                PrintUsage();
-            }
-            ExcludeCustomShapes = true;
-            inputName = args[1];
-            outputDir = args[2];
 
-        } else if ((args[0]).equals("-rep")) {
-            if (args.length < 3) {
-                PrintUsage();
-            }
-            ImageReplacement = true;
-            inputName = args[1];
-            outputDir = args[2];
-        } else {
-            inputName = args[0];
-            outputDir = args[1];
+        defineOptions(opt);
+        err = processArguments(opt, args);
+        if (err != 0) {
+            System.exit(3);
         }
 
         int exitCode = 0;
@@ -263,32 +222,40 @@ public class OpenOfficeUNODecomposition {
                 System.exit(5);
             }
 
-            // Possibly save original document as an OO document
-            String newName = possiblyUseTemporaryDocument(xContext, xMCF, xCompDoc, inputName, origFileFormat);
-            if (newName != null) {
-                xCompDoc.dispose();
-                inputName = newName;
-                xCompDoc = openFileForProcessing(xDesktop, newName);
-                if (xCompDoc == null) {
-                    System.out.printf("Unable to open temporary file '%s', aborting!\n", newName);
-                    System.exit(4);
+            if (functionExtractImages) {
+                // Possibly save original document as an OO document
+                String newName = possiblyUseTemporaryDocument(xContext, xMCF,
+                        xCompDoc, inputName, origFileFormat);
+                if (newName != null) {
+                    xCompDoc.dispose();
+                    inputName = newName;
+                    xCompDoc = openFileForProcessing(xDesktop, newName);
+                    if (xCompDoc == null) {
+                        System.out.printf("Unable to open temporary file '%s', aborting!\n", newName);
+                        System.exit(4);
+                    }
+                    fileType = getDocumentType(xContext, xMCF, fileNameToOOoURL(inputName));
+                    ooFileFormat = OOoFormat.findFormatWithDocumentType(fileType);
                 }
-                fileType = getDocumentType(xContext, xMCF, fileNameToOOoURL(inputName));
-                ooFileFormat = OOoFormat.findFormatWithDocumentType(fileType);
+                if (verbose) printSupportedServices(xCompDoc);   // possibly OO version
             }
-            if (verbose) printSupportedServices(xCompDoc);   // possibly OO version
 
             processFileFormat = (ooFileFormat == null) ? origFileFormat : ooFileFormat;
             // Decide how to process the document
             int handler = processFileFormat.getHandlerType();
             switch (handler) {
                 case 0:
-                    handleTextDocument(xContext, xMCF, xCompDoc, outputDir);
+                    if (functionImageReplacement) {
+                        replaceTextDocImage(xContext, xMCF, xCompDoc, "xxxorigname", fileNameToOOoURL(repImageFile));
+
+                    } else if (functionExtractImages) {
+                        handleTextDocument(xContext, xMCF, xCompDoc, outputDir);
+                    }
                     break;
                 case 2:
-                    if (ImageReplacement) {
-                        replacePresentationDocImage(xContext, xMCF, xCompDoc, "origname", fileNameToOOoURL(outputDir)/*XXX*/, 4/*XXX*/, 3/*XXX*/);
-                    } else {
+                    if (functionImageReplacement) {
+                        //replacePresentationDocImage(xContext, xMCF, xCompDoc, "origname", fileNameToOOoURL(repImageFile), repPageNum, repImageNum);
+                    } else if (functionExtractImages) {
                         handlePresentationDocument(xContext, xMCF, xCompDoc, outputDir);
                     }
                     break;
@@ -368,10 +335,11 @@ public class OpenOfficeUNODecomposition {
 
             System.out.println("Back from our nap!  Disposing of the file now.");
  */
-            if (verbose) System.out.println("Saving (possibly) modified document to a new file");
-            String saveAsName = "/Users/kwc/modifiedfiles/wood2.ppt";
-            storeDocument(xContext, xMCF, xCompDoc, saveAsName, origFileFormat.getFilterName());
-//            storeDocument(xContext, xMCF, xCompDoc, "/Users/kwc/modifiedfiles/foobar.doc");
+            if (outputName.compareTo("") != 0) {
+                if (verbose)
+                    System.out.printf("Saving (possibly) modified document to a new file, '%s'\n", outputName);
+                storeDocument(xContext, xMCF, xCompDoc, outputName, origFileFormat.getFilterName());
+            }
             if (verbose) System.out.println("We be done.");
             xCompDoc.dispose();
         } catch (java.lang.Exception e) {
@@ -379,6 +347,164 @@ public class OpenOfficeUNODecomposition {
         } finally {
             System.exit(exitCode);
         }
+    }
+
+    private static void defineOptions(Options opt)
+    {
+        OptionGroup mainopts = new OptionGroup();
+        mainopts.addOption(OptionBuilder.hasArg(false).withLongOpt("extract").create("e"));
+        mainopts.addOption(OptionBuilder.hasArg(false).withLongOpt("replace").create("r"));
+        mainopts.addOption(OptionBuilder.hasArg(false).withLongOpt("copy").create("c"));
+        opt.addOptionGroup(mainopts);
+/*
+        opt.addOption("e", "extract", false, "Extract images from a document");
+        opt.addOption("r", "replace", false, "Replace an image in a document");
+        opt.addOption("c", "copy", false, "Copy a document (testing OO conversion)");
+*/
+        opt.addOption("h", "help", false, "Print this usage information");
+        opt.addOption("v", "verbose", false, "Print verbose output information");
+        opt.addOption("xc", "exclude-custom-shapes", false, "Do not include Custom shapes when extracting");
+
+        opt.addOption("i", "input", true, "Input file name (full path)");
+        opt.addOption("o", "output", true, "Output file name (full path)");
+        opt.addOption("n", "newimage", true, "Replacement (new) image file (full path)");
+        opt.addOption("d", "output-dir", true, "Name of directory to receive output");
+
+        opt.addOption("p", "pagenum", true, "Page number");
+        opt.addOption("g", "imagenum", true, "Image number");
+    }
+
+    private static int processArguments(Options opt, String[] args)
+    {
+        CommandLine cl;
+        try {
+            BasicParser parser = new BasicParser();
+            cl = parser.parse(opt, args);
+        } catch (ParseException ex) {
+            System.out.printf("Error processing arguments: '%s'\n", ex.getMessage());
+            return 1;
+        }
+
+        if (cl.hasOption("v")) {
+            verbose = true;
+        }
+
+        if (cl.hasOption("h")) {
+            printUsage(opt);
+            return 8;
+        }
+
+        if (!cl.hasOption("e") && !cl.hasOption("r") && !cl.hasOption("c")) {
+            System.out.printf("You must choose a main function\n");
+            printUsage(opt);
+            return 2;
+        }
+
+        /* extract */
+        if (cl.hasOption("e")) {
+            functionExtractImages = true;
+            if (!cl.hasOption("i") || !cl.hasOption("d")) {
+                System.out.printf("For extract, you must specify the input file and output directory.\n");
+                printUsage(opt);
+                return 3;
+            }
+            inputName = cl.getOptionValue("i");
+            outputDir = cl.getOptionValue("d");
+
+            if (cl.hasOption("xc")) {
+                excludeCustomShapes = true;
+            }
+        }
+
+        /* replace */
+        if (cl.hasOption("r")) {
+            functionImageReplacement = true;
+            if (!cl.hasOption("i") || !cl.hasOption("o") || !cl.hasOption("n") || !cl.hasOption("p") || !cl.hasOption("g")) {
+                System.out.printf("For replace, you must specify input, output, and new image files, as well as page and shape numbers.\n");
+                printUsage(opt);
+                return 4;
+            }
+            inputName = cl.getOptionValue("i");
+            outputName = cl.getOptionValue("o");
+            repImageFile = cl.getOptionValue("n");
+            repPageNum = Integer.parseInt(cl.getOptionValue("p"));
+            repImageNum = Integer.parseInt(cl.getOptionValue("g"));
+            
+            // Convert page and image numbers to index values
+            if (repPageNum <= 0) {
+                System.out.printf("Page number of '%d' is invalid", repPageNum);
+                printUsage(opt);
+                return 5;
+            } else {
+                repPageNum -= 1;
+            }
+            if (repImageNum <= 0) {
+                System.out.printf("Image number of '%d' is invalid", repImageNum);
+                printUsage(opt);
+                return 6;
+            } else {
+                repImageNum -= 1;
+            }
+        }
+
+        /* copy */
+        if (cl.hasOption("c")) {
+            functionCopyFile = true;
+            if (!cl.hasOption("i") || !cl.hasOption("o")) {
+                System.out.printf("For copy, you must specify input and output file names.\n");
+                printUsage(opt);
+                return 7;
+            }
+        }
+
+        return 0;
+    }
+
+    private static void printUsage(Options opt)
+    {
+        HelpFormatter hf = new HelpFormatter();
+        hf.setWidth(75);
+        hf.printHelp(Usage, opt);
+    }
+
+    private static XComponent openFileForProcessing(XDesktop xDesktop, String inputFile)
+    {
+        // Set up to load the document
+        PropertyValue propertyValues[] = new PropertyValue[3];
+        propertyValues[0] = new PropertyValue();
+        propertyValues[0].Name = "Hidden";
+        propertyValues[0].Value = new Boolean(false);
+
+        propertyValues[1] = new PropertyValue();
+        propertyValues[1].Name = "ReadOnly";
+        propertyValues[1].Value = new Boolean(true);
+
+//        propertyValues[2] = new PropertyValue();
+//        propertyValues[2].Name = "FilterName";
+//        propertyValues[2].Value = new String("pdf_Portable_Document_Format");
+
+//            String sFileName = "/Users/kwc/Downloads/OER/2009-civic-sedan-brochure-OO-modified.odg";
+//            String sFileName = "/Users/kwc/Downloads/OER/2009-civic-sedan-brochure.pdf";
+//            String sFileName = "/Users/kwc/Downloads/OER/2009-civic-sedan-brochure.reallyapdf";
+
+        // Load the document
+        //System.out.print("Opening file '" + sFileName + "' ... ");
+        String sFileUrl = fileNameToOOoURL(inputFile);
+
+        XComponentLoader xCompLoader = (XComponentLoader)
+                UnoRuntime.queryInterface(XComponentLoader.class, xDesktop);
+
+
+        XComponent xCompDoc = null;
+        try {
+            xCompDoc = xCompLoader.loadComponentFromURL(
+                sFileUrl, "_blank", 0, propertyValues);
+        } catch (java.lang.Exception e) {
+            System.out.printf("Failed to open file '%s', error was '%s'\n",
+                    inputFile, e.getMessage());
+            System.exit(2);
+        }
+        return xCompDoc;
     }
 
     private static void handleTextDocument(XComponentContext xContext,
@@ -880,14 +1006,21 @@ private static void exportEmbeddedGraphics(XComponentContext xContext,
         return xPropSet;
     }
 
+    // XXX Revise this to use index value rather than a name!!!!! XXX
     /* From http://www.oooforum.org/forum/viewtopic.phtml?t=81870 */
     private static int replaceTextDocImage(XComponentContext xContext,
                                            XMultiComponentFactory xMCF,
                                            XComponent xCompDoc,
-                                           XTextDocument xTextDoc,
                                            String originalImageName,
                                            String replacementURL)
     {
+
+        XTextDocument xTextDoc =
+                    (XTextDocument) UnoRuntime.queryInterface(XTextDocument.class, xCompDoc);
+        if (xTextDoc == null) {
+            System.out.printf("Cannot get XTextDocument interface for Text Document???\n");
+            System.exit(7);
+        }
 
         byte[] replacementByteArray = GetImageByteStream(replacementURL);
         ByteArrayToXInputStreamAdapter xSource = new ByteArrayToXInputStreamAdapter(replacementByteArray);
@@ -1143,7 +1276,7 @@ private static void exportEmbeddedGraphics(XComponentContext xContext,
                         if (verbose) System.out.printf("Handling GroupShape (%d) on page %d\n", s+1, p+1);
                         exportImage(xContext, xMCF, currShape, outputDir, p + 1, s + 1);
                     } else if (currType.equalsIgnoreCase("com.sun.star.drawing.CustomShape")) {
-                        if (!ExcludeCustomShapes) {
+                        if (!excludeCustomShapes) {
                             if (verbose) System.out.printf("Handling CustomShape (%d) on page %d\n", s+1, p+1);
                             exportImage(xContext, xMCF, currShape, outputDir, p+1, s+1);
                         }
