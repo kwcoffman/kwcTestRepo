@@ -30,6 +30,9 @@ import org.apache.commons.cli.ParseException;
 import com.sun.star.accessibility.XAccessible;
 import com.sun.star.accessibility.XAccessibleContext;
 
+import com.sun.star.awt.Point;
+import com.sun.star.awt.Size;
+
 import com.sun.star.beans.Property;
 import com.sun.star.beans.PropertyValue;
 import com.sun.star.beans.XPropertySet;
@@ -40,6 +43,7 @@ import com.sun.star.comp.helper.Bootstrap;
 
 import com.sun.star.container.XNameAccess;
 import com.sun.star.container.XNamed;
+import com.sun.star.container.XNameContainer;
 import com.sun.star.container.NoSuchElementException;
 
 import com.sun.star.document.XExporter;
@@ -53,6 +57,7 @@ import com.sun.star.drawing.XDrawPageSupplier;
 import com.sun.star.drawing.XDrawPage;
 import com.sun.star.drawing.XShapes;
 import com.sun.star.drawing.XShape;
+//import com.sun.star.drawing.XTextShape; // Doesn't exist?
 //import com.sun.star.drawing.GraphicObjectShape;
 
 import com.sun.star.embed.XStorage;
@@ -97,7 +102,6 @@ import com.sun.star.text.XTextDocument;
 import com.sun.star.text.XTextGraphicObjectsSupplier;
 import com.sun.star.text.XTextEmbeddedObjectsSupplier;
 
-
 import com.sun.star.ucb.XSimpleFileAccess2;
 
 import com.sun.star.uno.Any;
@@ -136,6 +140,7 @@ public class OpenOfficeUNODecomposition {
     private static boolean excludeCustomShapes = false;
 
     private static boolean functionImageReplacement = false;
+    private static boolean functionCitationInsertion = false;
     private static boolean functionExtractImages = false;
     private static boolean functionCopyFile = false;
     
@@ -144,6 +149,7 @@ public class OpenOfficeUNODecomposition {
             "Global options: [--verbose]\n\n" +
             "--extract [ --exclude-custom-shapes ] --input <file> --output-dir <dir>\n\n" +
             "--replace <options> --input <file> --newimage <file> --pagenum <pagenum> --imagenum <imagenum>\n\n" +
+            "--cite <options> --input <file> --citeimage <file> --pagenum <pagenum> --imagenum <imagenum>\n\n" +
             "--copy <options> --input <file> --output <file>\n";
     
     private static String inputName;
@@ -153,6 +159,7 @@ public class OpenOfficeUNODecomposition {
     private static int repPageNum = -1;
     private static int repImageNum = -1;
     private static String repImageFile;
+    private static String citeImageFile;
 
     private static OOoFormat origFileFormat = null;
     private static OOoFormat ooFileFormat = null;
@@ -247,14 +254,17 @@ public class OpenOfficeUNODecomposition {
                 case 0:
                     if (functionImageReplacement) {
                         replaceTextDocImage(xContext, xMCF, xCompDoc, "xxxorigname", fileNameToOOoURL(repImageFile));
-
+                    } else if (functionCitationInsertion) {
+                        insertTextDocImageCitation(xContext, xMCF, xCompDoc, "xxxorigname", fileNameToOOoURL(citeImageFile));
                     } else if (functionExtractImages) {
                         handleTextDocument(xContext, xMCF, xCompDoc, outputDir);
                     }
                     break;
                 case 2:
                     if (functionImageReplacement) {
-                        //replacePresentationDocImage(xContext, xMCF, xCompDoc, "origname", fileNameToOOoURL(repImageFile), repPageNum, repImageNum);
+                        replacePresentationDocImage(xContext, xMCF, xCompDoc, "origname", fileNameToOOoURL(repImageFile), repPageNum, repImageNum);
+                    } else if (functionCitationInsertion) {
+                        insertPresentationDocImageCitation(xContext, xMCF, xCompDoc, "origname", fileNameToOOoURL(citeImageFile), repPageNum, repImageNum);
                     } else if (functionExtractImages) {
                         handlePresentationDocument(xContext, xMCF, xCompDoc, outputDir);
                     }
@@ -354,6 +364,7 @@ public class OpenOfficeUNODecomposition {
         OptionGroup mainopts = new OptionGroup();
         mainopts.addOption(OptionBuilder.hasArg(false).withLongOpt("extract").create("e"));
         mainopts.addOption(OptionBuilder.hasArg(false).withLongOpt("replace").create("r"));
+        mainopts.addOption(OptionBuilder.hasArg(false).withLongOpt("cite").create("t"));
         mainopts.addOption(OptionBuilder.hasArg(false).withLongOpt("copy").create("c"));
         opt.addOptionGroup(mainopts);
 /*
@@ -368,6 +379,7 @@ public class OpenOfficeUNODecomposition {
         opt.addOption("i", "input", true, "Input file name (full path)");
         opt.addOption("o", "output", true, "Output file name (full path)");
         opt.addOption("n", "newimage", true, "Replacement (new) image file (full path)");
+        opt.addOption("ti", "citeimage", true, "Image file containing citation information (full path)");
         opt.addOption("d", "output-dir", true, "Name of directory to receive output");
 
         opt.addOption("p", "pagenum", true, "Page number");
@@ -394,7 +406,7 @@ public class OpenOfficeUNODecomposition {
             return 8;
         }
 
-        if (!cl.hasOption("e") && !cl.hasOption("r") && !cl.hasOption("c")) {
+        if (!cl.hasOption("e") && !cl.hasOption("r") && !cl.hasOption("c") && !cl.hasOption("t")) {
             System.out.printf("You must choose a main function\n");
             printUsage(opt);
             return 2;
@@ -430,6 +442,37 @@ public class OpenOfficeUNODecomposition {
             repPageNum = Integer.parseInt(cl.getOptionValue("p"));
             repImageNum = Integer.parseInt(cl.getOptionValue("g"));
             
+            // Convert page and image numbers to index values
+            if (repPageNum <= 0) {
+                System.out.printf("Page number of '%d' is invalid", repPageNum);
+                printUsage(opt);
+                return 5;
+            } else {
+                repPageNum -= 1;
+            }
+            if (repImageNum <= 0) {
+                System.out.printf("Image number of '%d' is invalid", repImageNum);
+                printUsage(opt);
+                return 6;
+            } else {
+                repImageNum -= 1;
+            }
+        }
+
+        /* citation */
+        if (cl.hasOption("t")) {
+            functionCitationInsertion = true;
+            if (!cl.hasOption("i") || !cl.hasOption("o") || !cl.hasOption("ti") || !cl.hasOption("p") || !cl.hasOption("g")) {
+                System.out.printf("For replace, you must specify input, output, and citation image files, as well as page and shape numbers.\n");
+                printUsage(opt);
+                return 4;
+            }
+            inputName = cl.getOptionValue("i");
+            outputName = cl.getOptionValue("o");
+            citeImageFile = cl.getOptionValue("ti");
+            repPageNum = Integer.parseInt(cl.getOptionValue("p"));
+            repImageNum = Integer.parseInt(cl.getOptionValue("g"));
+
             // Convert page and image numbers to index values
             if (repPageNum <= 0) {
                 System.out.printf("Page number of '%d' is invalid", repPageNum);
@@ -1006,7 +1049,7 @@ private static void exportEmbeddedGraphics(XComponentContext xContext,
         return xPropSet;
     }
 
-    // XXX Revise this to use index value rather than a name!!!!! XXX
+    // XXX Revise this to use index value rather than a name !?!?!?!?!? XXX
     /* From http://www.oooforum.org/forum/viewtopic.phtml?t=81870 */
     private static int replaceTextDocImage(XComponentContext xContext,
                                            XMultiComponentFactory xMCF,
@@ -1026,7 +1069,8 @@ private static void exportEmbeddedGraphics(XComponentContext xContext,
         ByteArrayToXInputStreamAdapter xSource = new ByteArrayToXInputStreamAdapter(replacementByteArray);
 
         // Querying for the interface XMultiServiceFactory on the xtextdocument
-        XMultiServiceFactory xMSFDoc = (XMultiServiceFactory) UnoRuntime.queryInterface(XMultiServiceFactory.class, xTextDoc);
+        XMultiServiceFactory xMSFDoc = (XMultiServiceFactory)
+                UnoRuntime.queryInterface(XMultiServiceFactory.class, xTextDoc);
         Object oGraphic = null;
         try {
             // Creating the service GraphicObject
@@ -1040,6 +1084,7 @@ private static void exportEmbeddedGraphics(XComponentContext xContext,
 
         // Get the original image
 
+        // XXX Should use getTextImageObjectByName(xCompDoc, originalImageName);
         Any xImageAny = null;
         Object xImageObject = null;
         try {
@@ -1109,6 +1154,16 @@ private static void exportEmbeddedGraphics(XComponentContext xContext,
         return 0;
     }
 
+    /* XXX To be completed! */
+    private static int insertTextDocImageCitation(XComponentContext xContext,
+                                           XMultiComponentFactory xMCF,
+                                           XComponent xCompDoc,
+                                           String originalImageName,
+                                           String replacementURL)
+    {
+        return 0;
+    }
+
     /*
      * Original is from http://www.oooforum.org/forum/viewtopic.phtml?t=81870
      * Original code was dealing with Text Documents.  This is for Drawing
@@ -1132,7 +1187,7 @@ private static void exportEmbeddedGraphics(XComponentContext xContext,
      * For a test, assume that we're always changing image with index 1.  If
      * there is no image with index 1, then do nothing.
      */
-    private static int replacePresentationDocImage(XComponentContext xContext,
+   private static int replacePresentationDocImage(XComponentContext xContext,
                                                    XMultiComponentFactory xMCF,
                                                    XComponent xCompDoc,
                                                    String originalImageName,
@@ -1215,6 +1270,123 @@ private static void exportEmbeddedGraphics(XComponentContext xContext,
         return 0;
     }
 
+    /* XXX  To be completed
+       http://www.oooforum.org/forum/viewtopic.phtml?t=45734
+     */
+    private static int insertPresentationDocImageCitation(XComponentContext xContext,
+                                                   XMultiComponentFactory xMCF,
+                                                   XComponent xCompDoc,
+                                                   String originalImageName,
+                                                   String citationURL,
+                                                   int p,
+                                                   int s)
+    {
+        try {
+            XDrawPagesSupplier xDrawPagesSuppl =
+                    (XDrawPagesSupplier) UnoRuntime.queryInterface(XDrawPagesSupplier.class, xCompDoc);
+            if (xDrawPagesSuppl == null) {
+                System.out.println("Failed to get xDrawPagesSuppl from xComp");
+                return 1;
+            }
+
+            XDrawPages xDrawPages = xDrawPagesSuppl.getDrawPages();
+//            Object pageObject = xDrawPages.getByIndex(p);
+
+            System.out.printf("insertPresentationDocImageCitation: document has '%d' pages\n", xDrawPages.getCount());
+
+            XDrawPage drawPage =
+                    (XDrawPage) UnoRuntime.queryInterface(XDrawPage.class, xDrawPages.getByIndex(p));
+
+
+            //put something on the drawpage
+
+            System.out.printf("drawPage.getCount says there are %d objects\n", drawPage.getCount());
+
+            com.sun.star.drawing.XShapes xShapes = (com.sun.star.drawing.XShapes)
+                    UnoRuntime.queryInterface(com.sun.star.drawing.XShapes.class, drawPage);
+
+            // Use the original image location and size to determine the location
+            // and size (at least the width?) of the citation information
+
+            Object oOrigImage = xShapes.getByIndex(s);
+            XPropertySet xOrigPropSet = (XPropertySet)
+                    UnoRuntime.queryInterface(XPropertySet.class, oOrigImage);
+//            printObjectProperties(oOrigImage);
+            XShape xOrigImage = (XShape) UnoRuntime.queryInterface(XShape.class, oOrigImage);
+//            printShapeProperties(xOrigImage);
+
+            Point citeImagePos = calculateCitationImagePosition(xOrigImage);
+            Size citeImageSize = calculateCitationImageSize(xOrigImage);
+
+            String convertedURL = getInternalURL(xCompDoc, citationURL, "image");
+
+            try {
+                // Add citation image
+                XShape xCIShape = createShape(xCompDoc, citeImagePos, citeImageSize,
+                                        "com.sun.star.drawing.GraphicObjectShape");
+                XPropertySet xImageProps = (XPropertySet)
+                UnoRuntime.queryInterface(XPropertySet.class, xCIShape);
+                xImageProps.setPropertyValue("GraphicURL", convertedURL);
+                xShapes.add(xCIShape);
+                System.out.printf("drawPage.getCount nows says there are %d objects\n", drawPage.getCount());
+
+                Point citeTextPos = calculateCitationTextPosition(xCIShape);
+                Size citeTextSize = calculateCitationTextSize(xOrigImage, xCIShape);
+
+                // Add citation text
+                XShape xCTShape = createShape(xCompDoc, citeTextPos, citeTextSize,
+                                        "com.sun.star.drawing.TextShape");  // There is also a TextShape?
+                xShapes.add(xCTShape);
+/***
+                XPropertySet xCTProps = UnoRuntime.queryInterface(XPropertySet.class, xCTShape);
+                // blue fill color
+                xCTProps.setPropertyValue("FillColor", new Integer(0x00c000));
+                // black line color
+                xCTProps.setPropertyValue("LineColor", new Integer(0xffffff));
+
+                xCTProps.setPropertyValue("TextFitToSize", com.sun.star.drawing.TextFitToSizeType.PROPORTIONAL);
+                xCTProps.setPropertyValue("TextAutoGrowHeight", new Boolean(true));
+                xCTProps.setPropertyValue("TextAutoGrowWidth", new Boolean(true));
+***/
+/*
+                // blue fill color
+                xCTProps.setPropertyValue("FillColor", new Integer(0x0000C0));
+                // black line color
+                xCTProps.setPropertyValue("LineColor", new Integer(0x000000));
+                xCTProps.setPropertyValue("Name", "Rounded Gray Rectangle");
+
+                //xCTProps.setPropertyValue("TextFitToSize", new Boolean(true));
+                xCTProps.setPropertyValue("TextFitToSize", com.sun.star.drawing.TextFitToSizeType.PROPORTIONAL);
+                //xCTProps.setPropertyValue("TextAutoGrowHeight", new Boolean(true));
+                xCTProps.setPropertyValue("TextAutoGrowHeight", true);
+                xCTProps.setPropertyValue("TextAutoGrowWidth", true);
+
+                xCTProps.setPropertyValue("CharColor", new Integer(0xCC0000));  //  XXX Doesn't do anything?
+                xCTProps.setPropertyValue("CharHeight", 4);  //  XXX Doesn't do anything?
+                //xCTProps.setPropertyValue("LineStyle", com.sun.star.drawing.LineStyle.NONE);
+                //xCTProps.setPropertyValue("FillStyle", com.sun.star.drawing.FillStyle.NONE);
+*/
+                XText xText = UnoRuntime.queryInterface(XText.class, xCTShape);
+                XTextCursor xTextCursor = xText.createTextCursor();
+                XPropertySet xTxtProps = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, xTextCursor);
+                
+                xTxtProps.setPropertyValue("CharHeight", 8);
+                xTxtProps.setPropertyValue("CharColor", new Integer(0xffffff));
+                xText.setString("http://open.umich.edu This is a long string to see what will happen with a large amount of text if the text is too long to fit within the rectangle.  We'll add even more text to see what happens when the smaller text exceeds the defined rectangle that is supposed to contain the text.");
+                //xTxtProps.setPropertyValue("HyperLinkURL", "http://open.umich.edu"); // XXX Doesn't work for impress documents.
+                //xText.setString("CC-BY");
+
+            } catch (java.lang.Exception ex) {
+                Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
+            }
+
+        } catch (Exception ex) {
+            Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return 0;
+    }
+
+
     private static void handleDrawDocument(XComponentContext xContext,
                                           XMultiComponentFactory xMCF,
                                           XComponent xCompDoc,
@@ -1294,11 +1466,144 @@ private static void exportEmbeddedGraphics(XComponentContext xContext,
         }
     }
 
-    private static void printShapeProperties(XShape shape) throws WrappedTargetException {
+    /* Original code is from:
+     *   http://www.oooforum.org/forum/viewtopic.phtml?t=17139
+     * Seems pretty complicated!!
+     */
+    private static String convertLinkedImageToEmbeddedImageForTextDocument(XComponentContext xContext,
+                                          XMultiComponentFactory xMCF,
+                                          XComponent xCompDoc,
+                                          String origImageURL) {
+        String jlsInternalUrl = null;
+        XTextDocument xTextDoc = (XTextDocument)
+                UnoRuntime.queryInterface(XTextDocument.class, xCompDoc);
+        if (xTextDoc == null) {
+            return jlsInternalUrl;
+        }
+
+        try {
+            XMultiServiceFactory xMSFDoc = (XMultiServiceFactory)
+                    UnoRuntime.queryInterface(XMultiServiceFactory.class, xTextDoc);
+
+            // Get document object from the class member m_xTextDocument
+            XTextGraphicObjectsSupplier xTGOS = (XTextGraphicObjectsSupplier)
+                    UnoRuntime.queryInterface(XTextGraphicObjectsSupplier.class, xCompDoc);
+            XNameAccess xNAGraphicObjects = xTGOS.getGraphicObjects();
+            Object origGO = xNAGraphicObjects.getByName(origImageURL);
+            XTextContent xTCGraphicObject = (XTextContent)
+                    UnoRuntime.queryInterface(XTextContent.class, origGO);
+            XPropertySet xPSTCGraphicObject = (XPropertySet)
+                    UnoRuntime.queryInterface(XPropertySet.class, xTCGraphicObject);
+
+            // Current internal URL of the image
+            String jlsGOUrl = xPSTCGraphicObject.getPropertyValue("GraphicURL").toString();
+            XTextRange xTRTCGraphicObject = xTCGraphicObject.getAnchor();
+
+            // New internal URL
+            jlsInternalUrl = new String("");
+
+            // Temporary GraphicObject number 1.
+            Object jloShape1 = xMSFDoc.createInstance("com.sun.star.drawing.GraphicObjectShape");
+            XShape xGOShape1 = (XShape) UnoRuntime.queryInterface(XShape.class, jloShape1);
+            XTextContent xTCShape1 = (XTextContent) UnoRuntime.queryInterface(XTextContent.class, xGOShape1);
+            XPropertySet xPSShape1 = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, xGOShape1);
+
+            // Temporary GraphicObject number 2.
+            Object jloShape2 = xMSFDoc.createInstance("com.sun.star.drawing.GraphicObjectShape");
+            XShape xGOShape2 = (XShape) UnoRuntime.queryInterface(XShape.class, jloShape2);
+            XTextContent xTCShape2 = (XTextContent) UnoRuntime.queryInterface(XTextContent.class, xGOShape2);
+            XPropertySet xPSShape2 = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, xGOShape2);
+
+            // The temporary GraphicObject number 1 points to the original GraphicObject file
+            xPSShape1.setPropertyValue("GraphicURL", jlsGOUrl);
+            // By inserting the temporary GraphicObject number 1, OpenOffice creates its bitmap.
+            xTRTCGraphicObject.getText().insertTextContent(xTRTCGraphicObject, xTCShape1, false);
+            // Assign the Bitmap of temporary GraphicObject number 1 to temporary GraphicObject number 2.
+            xPSShape2.setPropertyValue("GraphicObjectFillBitmap", xPSShape1.getPropertyValue("GraphicObjectFillBitmap"));
+            // By inserting the temporary GraphicObject number 2, OpenOffice creates its internal URL (and its bitmap).
+            xTRTCGraphicObject.getText().insertTextContent(xTRTCGraphicObject, xTCShape2, false);
+            // The temporary GraphicObject number 1 is no longer needed.
+            xTRTCGraphicObject.getText().removeTextContent(xTCShape1);
+            // Get the internal URL of the temporary GraphicObject number 2.
+            jlsInternalUrl = xPSShape2.getPropertyValue("GraphicURL").toString();
+            // Assign to original GraphicObject the same internal URL as the Temporary GraphicObject number 2.
+            xPSTCGraphicObject.setPropertyValue("GraphicURL", jlsInternalUrl);
+            // The temporary GraphicObject number 2 is no longer needed.
+            xTRTCGraphicObject.getText().removeTextContent(xTCShape2);
+        } catch (UnknownPropertyException ex) {
+            Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (WrappedTargetException ex) {
+            Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (NoSuchElementException ex) {
+            Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (Exception ex) {
+            Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return jlsInternalUrl;
+    }
+
+
+    private static Object getTextImageObjectByName(XComponent xTextDoc, String name)
+    {
+        Any xImageAny = null;
+        Object xImageObject = null;
+        try {
+            XTextGraphicObjectsSupplier xTGOS = (XTextGraphicObjectsSupplier) UnoRuntime.queryInterface(XTextGraphicObjectsSupplier.class, xTextDoc);
+            XNameAccess xNAGraphicObjects = xTGOS.getGraphicObjects();
+            xImageAny = (Any) xNAGraphicObjects.getByName(name);
+        } catch (NoSuchElementException ex) {
+            Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (WrappedTargetException ex) {
+            Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        if (xImageAny == null) {
+            return 1;
+        }
+        return xImageAny.getObject();
+    }
+
+    /*private static Object getPresentationImageObjectByName()
+    {
+
+    }*/
+
+    /* http://www.oooforum.org/forum/viewtopic.phtml?t=45734 */
+    public static String getInternalURL(XComponent xDrawDoc,
+                                        String srcUrl,
+                                        String imgName) throws Exception
+    {
+        XMultiServiceFactory xFactory = (XMultiServiceFactory)
+                UnoRuntime.queryInterface(XMultiServiceFactory.class, xDrawDoc);
+        Object xBitObj = xFactory.createInstance("com.sun.star.drawing.BitmapTable");
+        XNameContainer bitMaps = (XNameContainer)
+                UnoRuntime.queryInterface(XNameContainer.class, xBitObj);
+
+        bitMaps.insertByName(imgName, srcUrl);
+        return (String) bitMaps.getByName(imgName);
+    }
+
+    public static XShape createShape(XComponent xDrawDoc,
+                                     com.sun.star.awt.Point aPos,
+                                     com.sun.star.awt.Size aSize,
+                                     String sShapeType ) throws java.lang.Exception
+    {
+        XShape xShape = null;
+        XMultiServiceFactory xFactory = (XMultiServiceFactory)
+                UnoRuntime.queryInterface(XMultiServiceFactory.class, xDrawDoc);
+        Object xObj = xFactory.createInstance(sShapeType);
+        xShape = (XShape) UnoRuntime.queryInterface(XShape.class, xObj);
+        xShape.setPosition(aPos);
+        xShape.setSize(aSize);
+        return xShape;
+    }
+
+    private static void printShapeProperties(XShape shape) throws WrappedTargetException
+    {
 
         // Get and print all the shape's properties
         XPropertySet xShapeProperties = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, shape);
         Property[] props = xShapeProperties.getPropertySetInfo().getProperties();
+        System.out.println("----- Printing Shape Properties -----");
         for (int x = 0; x < props.length; x++) {
             try {
                 System.out.println("    Property " + props[x].Name + " = " + xShapeProperties.getPropertyValue(props[x].Name));
@@ -1308,6 +1613,74 @@ private static void exportEmbeddedGraphics(XComponentContext xContext,
         }
         System.out.println();
 
+    }
+
+    private static void printObjectProperties(Object obj) throws WrappedTargetException
+    {
+
+        // Get and print all the shape's properties
+        XPropertySet xShapeProperties = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, obj);
+        Property[] props = xShapeProperties.getPropertySetInfo().getProperties();
+        System.out.println("----- Printing Object Properties -----");
+        for (int x = 0; x < props.length; x++) {
+            try {
+                System.out.println("    Property " + props[x].Name + " = " + xShapeProperties.getPropertyValue(props[x].Name));
+            } catch (UnknownPropertyException ex) {
+                Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+        System.out.println();
+
+    }
+
+    // Assumes that the original image shape is supplied
+    private static Point calculateCitationImagePosition(XShape xShape)
+    {
+        Point aPos = xShape.getPosition();
+        Size aSize = xShape.getSize();
+        Point citationPos = new Point();
+
+        citationPos.X = aPos.X;
+        citationPos.Y = aPos.Y + aSize.Height + 200;
+        return citationPos;
+    }
+
+    // Assumes that the citation image shape is supplied
+    private static Point calculateCitationTextPosition(XShape xShape)
+    {
+        Point aPos = xShape.getPosition();
+        Size aSize = xShape.getSize();
+        Point citeTextPos = new Point();
+
+        citeTextPos.X = aPos.X + aSize.Width + 200;
+        citeTextPos.Y = aPos.Y;
+        return citeTextPos;
+    }
+
+    // Assumes that the original image shape is supplied
+    private static Size calculateCitationImageSize(XShape xShape)
+    {
+        Point aPos = xShape.getPosition();
+        Size aSize = xShape.getSize();
+        Size citationSize = new Size();
+
+        citationSize.Height = 31 * 20;  // 400;  Image is 88x31 pixels  show it 20 times that size
+        citationSize.Width = 88 * 20; //aSize.Width;
+        return citationSize;
+    }
+
+    // Assumes that the citation image shape is supplied
+    private static Size calculateCitationTextSize(XShape xImage, XShape xCiteImage)
+    {
+//        Point imagePos = xImage.getPosition();
+        Size imageSize = xImage.getSize();
+//        Point citePos = xCiteImage.getPosition();
+        Size citeSize = xCiteImage.getSize();
+        Size citeTextSize = new Size();
+
+        citeTextSize.Height = citeSize.Height;
+        citeTextSize.Width = imageSize.Width - citeSize.Width - 200;
+        return citeTextSize;
     }
 
     private static void printSupportedServices(XComponent xCompDoc)
