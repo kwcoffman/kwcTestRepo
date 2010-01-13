@@ -46,10 +46,10 @@ import com.sun.star.uno.XComponentContext;
  */
 public class DecompImpress {
 
-    public static void handleDocument(XComponentContext xContext,
-                                       XMultiComponentFactory xMCF,
-                                       XComponent xCompDoc,
-                                       String outputDir)
+    public static void extractImages(XComponentContext xContext,
+                                     XMultiComponentFactory xMCF,
+                                     XComponent xCompDoc,
+                                     String outputDir)
     {
         // Query for the XDrawPagesSupplier interface
         XDrawPagesSupplier xDrawPagesSuppl =
@@ -58,19 +58,6 @@ public class DecompImpress {
             System.out.printf("Cannot get XDrawPagesSupplier interface for Presentation Document???\n");
             System.exit(8);
         }
-
-
-        handleDrawDocument(xContext, xMCF, xCompDoc, xDrawPagesSuppl, outputDir);
-        return;
-
-    }
-
-    private static void handleDrawDocument(XComponentContext xContext,
-                                          XMultiComponentFactory xMCF,
-                                          XComponent xCompDoc,
-                                          XDrawPagesSupplier xDrawPagesSuppl,
-                                          String outputDir)
-    {
         try {
             XDrawPages xDrawPages = xDrawPagesSuppl.getDrawPages();
             Object firstPage = xDrawPages.getByIndex(0);
@@ -167,13 +154,13 @@ public class DecompImpress {
      * For a test, assume that we're always changing image with index 1.  If
      * there is no image with index 1, then do nothing.
      */
-   public static int replacePresentationDocImage(XComponentContext xContext,
-                                                 XMultiComponentFactory xMCF,
-                                                 XComponent xCompDoc,
-                                                 String originalImageName,
-                                                 String replacementURL,
-                                                 int p,
-                                                 int s)
+   public static int replaceImage(XComponentContext xContext,
+                                  XMultiComponentFactory xMCF,
+                                  XComponent xCompDoc,
+                                  String originalImageName,
+                                  String replacementURL,
+                                  int p,
+                                  int s)
     {
 
         XDrawPage currPage = null;
@@ -253,13 +240,13 @@ public class DecompImpress {
     /* XXX  To be completed
        http://www.oooforum.org/forum/viewtopic.phtml?t=45734
      */
-    public static int insertPresentationDocImageCitation(XComponentContext xContext,
-                                                   XMultiComponentFactory xMCF,
-                                                   XComponent xCompDoc,
-                                                   String originalImageName,
-                                                   String citationURL,
-                                                   int p,
-                                                   int s)
+    public static int insertImageCitation(XComponentContext xContext,
+                                          XMultiComponentFactory xMCF,
+                                          XComponent xCompDoc,
+                                          String originalImageName,
+                                          String citationURL,
+                                          int p,
+                                          int s)
     {
         try {
             XDrawPagesSupplier xDrawPagesSuppl =

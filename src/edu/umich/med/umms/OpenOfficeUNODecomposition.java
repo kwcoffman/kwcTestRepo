@@ -166,20 +166,20 @@ public class OpenOfficeUNODecomposition {
             switch (handler) {
                 case 0:
                     if (functionImageReplacement) {
-                        DecompText.replaceTextDocImage(xContext, xMCF, xCompDoc, "xxxorigname", DecompUtil.fileNameToOOoURL(repImageFile));
+                        DecompText.replaceImage(xContext, xMCF, xCompDoc, "xxxorigname", DecompUtil.fileNameToOOoURL(repImageFile));
                     } else if (functionCitationInsertion) {
-                        DecompText.insertTextDocImageCitation(xContext, xMCF, xCompDoc, "xxxorigname", DecompUtil.fileNameToOOoURL(citeImageFile));
+                        DecompText.insertImageCitation(xContext, xMCF, xCompDoc, "xxxorigname", DecompUtil.fileNameToOOoURL(citeImageFile));
                     } else if (functionExtractImages) {
-                        DecompText.handleDocument(xContext, xMCF, xCompDoc, outputDir);
+                        DecompText.extractImages(xContext, xMCF, xCompDoc, outputDir);
                     }
                     break;
                 case 2:
                     if (functionImageReplacement) {
-                        DecompImpress.replacePresentationDocImage(xContext, xMCF, xCompDoc, "origname", DecompUtil.fileNameToOOoURL(repImageFile), repPageNum, repImageNum);
+                        DecompImpress.replaceImage(xContext, xMCF, xCompDoc, "origname", DecompUtil.fileNameToOOoURL(repImageFile), repPageNum, repImageNum);
                     } else if (functionCitationInsertion) {
-                        DecompImpress.insertPresentationDocImageCitation(xContext, xMCF, xCompDoc, "origname", DecompUtil.fileNameToOOoURL(citeImageFile), repPageNum, repImageNum);
+                        DecompImpress.insertImageCitation(xContext, xMCF, xCompDoc, "origname", DecompUtil.fileNameToOOoURL(citeImageFile), repPageNum, repImageNum);
                     } else if (functionExtractImages) {
-                        DecompImpress.handleDocument(xContext, xMCF, xCompDoc, outputDir);
+                        DecompImpress.extractImages(xContext, xMCF, xCompDoc, outputDir);
                     }
                     break;
                 case 1:
@@ -258,7 +258,7 @@ public class OpenOfficeUNODecomposition {
 
             System.out.println("Back from our nap!  Disposing of the file now.");
  */
-            if (outputName.compareTo("") != 0) {
+            if (outputName != null && outputName.compareTo("") != 0) {
                 if (DecompUtil.beingVerbose())
                     System.out.printf("Saving (possibly) modified document to a new file, '%s'\n", outputName);
                 DecompUtil.storeDocument(xContext, xMCF, xCompDoc, outputName, origFileFormat.getFilterName());

@@ -12,8 +12,8 @@ import java.util.logging.Logger;
 
 import com.sun.star.beans.PropertyValue;
 import com.sun.star.beans.XPropertySet;
-import com.sun.star.beans.UnknownPropertyException;
 
+import com.sun.star.container.XIndexAccess;
 import com.sun.star.container.XNameAccess;
 import com.sun.star.container.XNamed;
 import com.sun.star.container.NoSuchElementException;
@@ -36,8 +36,9 @@ import com.sun.star.lib.uno.adapter.XOutputStreamToByteArrayAdapter;
 
 import com.sun.star.text.XTextContent;
 import com.sun.star.text.XTextFramesSupplier;
-import com.sun.star.text.XTextRange;
 import com.sun.star.text.XTextDocument;
+import com.sun.star.text.XTextEmbeddedObject;
+import com.sun.star.text.XTextEmbeddedObjectsSupplier;
 import com.sun.star.text.XTextGraphicObjectsSupplier;
 
 import com.sun.star.uno.Any;
@@ -53,10 +54,11 @@ import com.sun.star.uno.XComponentContext;
  */
 public class DecompText {
 
-    public static void handleDocument(XComponentContext xContext,
-                                       XMultiComponentFactory xMCF,
-                                       XComponent xCompDoc,
-                                       String outputDir)
+    /* This version uses names rather than indexes to gather the images... */
+    public static void extractImagesUsingNames(XComponentContext xContext,
+                                     XMultiComponentFactory xMCF,
+                                     XComponent xCompDoc,
+                                     String outputDir)
     {
         // Query for the XTextDocument interface
         XTextDocument xTextDoc =
@@ -66,45 +68,6 @@ public class DecompText {
             System.exit(7);
         }
 
-        handleTextDocumentImages(xContext, xMCF, xCompDoc, xTextDoc, outputDir);
-        //handleTextDocumentImages2(xContext, xMCF, xCompDoc, xTextDoc, outputDir);
-        return;     // XXX XXX XXX XXX XXX
-
-/*
-        // Querying for the interface XMultiServiceFactory on the xTextDoc
-        XMultiServiceFactory xMSFDoc =
-                (XMultiServiceFactory) UnoRuntime.queryInterface(
-                XMultiServiceFactory.class, xTextDoc);
-
-        if (xMSFDoc == null) {
-            System.out.println("Failed to get xMSFDoc from xTextDoc");
-        } else {
-            Object oGraphic = null;
-            try {
-                // Create the service GraphicObject
-                oGraphic =
-                        xMSFDoc.createInstance("com.sun.star.text.TextGraphicObject");
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-
-            // Get the text of the document
-            com.sun.star.text.XText xText = xTextDoc.getText();
-
-            String t = xText.getString();
-
-            System.out.printf("The document text is:\n======================\n%s\n======================\n", t);
-
-        }
- */
-    }
-
-    private static void handleTextDocumentImages(XComponentContext xContext,
-                                                XMultiComponentFactory xMCF,
-                                                XComponent xCompDoc,
-                                                XTextDocument xTextDoc,
-                                                String outputDir)
-    {
         // XTextFramesSupplier
 //        try {
             XTextFramesSupplier xTextFramesSuppl = (XTextFramesSupplier)
@@ -126,10 +89,10 @@ public class DecompText {
 //                XMultiServiceFactory.class, xCompDoc);
 
 //            xGraphicProvider.storeGraphic(arg0, arg1);
-            Object graphicProviderObject = xMCF.createInstanceWithContext(
+            Object oGraphicProvider = xMCF.createInstanceWithContext(
                     "com.sun.star.graphic.GraphicProvider", xContext);
             XGraphicProvider xGraphicProvider = (XGraphicProvider)
-                    UnoRuntime.queryInterface(XGraphicProvider.class, graphicProviderObject);
+                    UnoRuntime.queryInterface(XGraphicProvider.class, oGraphicProvider);
 
             XTextGraphicObjectsSupplier xTextGraphSuppl = (XTextGraphicObjectsSupplier)
                     UnoRuntime.queryInterface(XTextGraphicObjectsSupplier.class, xCompDoc);
@@ -185,11 +148,55 @@ public class DecompText {
 
     }
 
+    /* Using indexes rather than names */
+    public static void extractImages(XComponentContext xContext,
+                                     XMultiComponentFactory xMCF,
+                                     XComponent xCompDoc,
+                                     String outputDir)
+    {
+        XTextDocument xTextDoc =
+                    (XTextDocument) UnoRuntime.queryInterface(XTextDocument.class, xCompDoc);
+        if (xTextDoc == null) {
+            System.out.printf("Cannot get XTextDocument interface for Text Document???\n");
+            System.exit(7);
+        }
 
+        try {
+//            XMultiServiceFactory xMSF = (XMultiServiceFactory) UnoRuntime.queryInterface(
+//                XMultiServiceFactory.class, xCompDoc);
+
+//            xGraphicProvider.storeGraphic(arg0, arg1);
+            Object oGraphicProvider = xMCF.createInstanceWithContext(
+                    "com.sun.star.graphic.GraphicProvider", xContext);
+            XGraphicProvider xGraphicProvider = (XGraphicProvider)
+                    UnoRuntime.queryInterface(XGraphicProvider.class, oGraphicProvider);
+
+            XTextGraphicObjectsSupplier xTextGOS = (XTextGraphicObjectsSupplier)
+                    UnoRuntime.queryInterface(XTextGraphicObjectsSupplier.class, xCompDoc);
+            XNameAccess xEONames = xTextGOS.getGraphicObjects();
+            XIndexAccess xEOIndexes = (XIndexAccess)
+                    UnoRuntime.queryInterface(XIndexAccess.class, xEONames);
+            if (DecompUtil.beingVerbose()) System.out.printf("There are %d embedded objects in this document\n", xEOIndexes.getCount());
+
+            for (int i = 0; i < xEOIndexes.getCount(); i++) {
+                //Object oTextEO = xEOIndexes.getByIndex(i);
+                //XTextEmbeddedObject xTextEO = (XTextEmbeddedObject) UnoRuntime.queryInterface(XTextEmbeddedObject.class, oTextEO);
+                XShape graphicShape = (XShape)
+                        UnoRuntime.queryInterface(XShape.class, xEOIndexes.getByIndex(i));
+                XPropertySet textProps = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, graphicShape);
+                String pictureURL = textProps.getPropertyValue("GraphicURL").toString();
+                pictureURL = pictureURL.substring(27);  // Chop off the leading "vnd.sun.star.GraphicObject:"
+                String outName = DecompUtil.constructBaseImageName(outputDir, 1, i);
+                DecompUtil.extractImageByURL(xContext, xMCF, xCompDoc, pictureURL, outName);
+            }
+        } catch (Exception ex) {
+            Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
 
     // XXX Revise this to use index value rather than a name !?!?!?!?!? XXX
     /* From http://www.oooforum.org/forum/viewtopic.phtml?t=81870 */
-    public static int replaceTextDocImage(XComponentContext xContext,
+    public static int replaceImage(XComponentContext xContext,
                                            XMultiComponentFactory xMCF,
                                            XComponent xCompDoc,
                                            String originalImageName,
@@ -222,7 +229,7 @@ public class DecompText {
 
         // Get the original image
 
-        // XXX Should use getTextImageObjectByName(xCompDoc, originalImageName);
+        // XXX Should use getImageObjectByName(xCompDoc, originalImageName);
         Any xImageAny = null;
         Object xImageObject = null;
         try {
@@ -293,21 +300,23 @@ public class DecompText {
     }
 
     /* XXX To be completed! */
-    public static int insertTextDocImageCitation(XComponentContext xContext,
-                                           XMultiComponentFactory xMCF,
-                                           XComponent xCompDoc,
-                                           String originalImageName,
-                                           String replacementURL)
+    public static int insertImageCitation(XComponentContext xContext,
+                                          XMultiComponentFactory xMCF,
+                                          XComponent xCompDoc,
+                                          String originalImageName,
+                                          String replacementURL)
     {
         return 0;
     }
+
 
 
     /* Original code is from:
      *   http://www.oooforum.org/forum/viewtopic.phtml?t=17139
      * Seems pretty complicated!!
      */
-    private static String convertLinkedImageToEmbeddedImageForTextDocument(XComponentContext xContext,
+/*
+    private static String convertLinkedImageToEmbeddedImage(XComponentContext xContext,
                                           XMultiComponentFactory xMCF,
                                           XComponent xCompDoc,
                                           String origImageURL) {
@@ -378,9 +387,9 @@ public class DecompText {
         }
         return jlsInternalUrl;
     }
+*/
 
-
-    private static Object getTextImageObjectByName(XComponent xTextDoc, String name)
+    private static Object getImageObjectByName(XComponent xTextDoc, String name)
     {
         Any xImageAny = null;
         Object xImageObject = null;
@@ -436,20 +445,8 @@ public class DecompText {
         }
     }
 
-    private static XDrawPage getTextDrawPage(XDrawPage xDrawPage, int nIndex)
+    private static XDrawPage getDrawPage(XDrawPage xDrawPage, int nIndex)
     {
-/*
-        XDrawPage xDP = null;
-        try {
-            if ( nIndex < xDrawPage.getCount() )
-                xDP = (XDrawPage) UnoRuntime.queryInterface(
-                        XDrawPage.class, xDrawPage.getByIndex(nIndex));
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            return xDP;
-        }
- */
         XDrawPage xDP = null;
         try {
             Object oDP = xDrawPage.getByIndex(nIndex);
