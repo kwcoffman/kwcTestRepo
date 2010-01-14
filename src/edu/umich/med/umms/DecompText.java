@@ -37,8 +37,6 @@ import com.sun.star.lib.uno.adapter.XOutputStreamToByteArrayAdapter;
 import com.sun.star.text.XTextContent;
 import com.sun.star.text.XTextFramesSupplier;
 import com.sun.star.text.XTextDocument;
-import com.sun.star.text.XTextEmbeddedObject;
-import com.sun.star.text.XTextEmbeddedObjectsSupplier;
 import com.sun.star.text.XTextGraphicObjectsSupplier;
 
 import com.sun.star.uno.Any;
@@ -176,7 +174,7 @@ public class DecompText {
             XNameAccess xEONames = xTextGOS.getGraphicObjects();
             XIndexAccess xEOIndexes = (XIndexAccess)
                     UnoRuntime.queryInterface(XIndexAccess.class, xEONames);
-            if (DecompUtil.beingVerbose()) System.out.printf("There are %d embedded objects in this document\n", xEOIndexes.getCount());
+            if (DecompUtil.beingVerbose()) System.out.printf("There are %d GraphicsObjects in this document\n", xEOIndexes.getCount());
 
             for (int i = 0; i < xEOIndexes.getCount(); i++) {
                 //Object oTextEO = xEOIndexes.getByIndex(i);
