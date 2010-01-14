@@ -52,101 +52,7 @@ import com.sun.star.uno.XComponentContext;
  */
 public class DecompText {
 
-    /* This version uses names rather than indexes to gather the images... */
-    public static void extractImagesUsingNames(XComponentContext xContext,
-                                     XMultiComponentFactory xMCF,
-                                     XComponent xCompDoc,
-                                     String outputDir)
-    {
-        // Query for the XTextDocument interface
-        XTextDocument xTextDoc =
-                    (XTextDocument) UnoRuntime.queryInterface(XTextDocument.class, xCompDoc);
-        if (xTextDoc == null) {
-            System.out.printf("Cannot get XTextDocument interface for Text Document???\n");
-            System.exit(7);
-        }
-
-        // XTextFramesSupplier
-//        try {
-            XTextFramesSupplier xTextFramesSuppl = (XTextFramesSupplier)
-                    UnoRuntime.queryInterface(XTextFramesSupplier.class, xCompDoc);
-            XNameAccess xTFnames = xTextFramesSuppl.getTextFrames();
-            if (xTFnames.hasElements()) {
-                // yada yada yada
-            }
-
-//        } catch (Exception ex) {
-//            Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
-//        }
-
-
-
-        // XTextGraphicObjectsSupplier
-        try {
-//            XMultiServiceFactory xMSF = (XMultiServiceFactory) UnoRuntime.queryInterface(
-//                XMultiServiceFactory.class, xCompDoc);
-
-//            xGraphicProvider.storeGraphic(arg0, arg1);
-            Object oGraphicProvider = xMCF.createInstanceWithContext(
-                    "com.sun.star.graphic.GraphicProvider", xContext);
-            XGraphicProvider xGraphicProvider = (XGraphicProvider)
-                    UnoRuntime.queryInterface(XGraphicProvider.class, oGraphicProvider);
-
-            XTextGraphicObjectsSupplier xTextGraphSuppl = (XTextGraphicObjectsSupplier)
-                    UnoRuntime.queryInterface(XTextGraphicObjectsSupplier.class, xCompDoc);
-            XNameAccess xGOnames = xTextGraphSuppl.getGraphicObjects();
-            if (xGOnames.hasElements()) {
-                Class objclass = xGOnames.getClass();
-                String[] graphicNames = xGOnames.getElementNames();
-                int numImages = graphicNames.length;
-                if (DecompUtil.beingVerbose()) System.out.printf("There are %d GraphicObjects in this file\n", numImages);
-                /*
-                for (int i = 0; i < numImages; i++) {
-                    try {
-                        System.out.println("The name of the image is: " + graphicNames[i]);
-                        //Object graphicsObject = xGOnames.getByName(graphicNames[i]);
-                        XShape graphicShape = (XShape) UnoRuntime.queryInterface(XShape.class, xGOnames.getByName(graphicNames[i]));
-                        printShapeProperties(graphicShape);
-                        exportImage(xMCF, xContext, graphicShape, outputDir, 0, i + 1);
-                    } catch (NoSuchElementException ex) {
-                        Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
-                    } catch (WrappedTargetException ex) {
-                        Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
-                    }
-                }
-                */
-                int i = 0;
-                for (String name:graphicNames) {
-                    try {
-                        i++;
-                        if (DecompUtil.beingVerbose()) System.out.printf("The name of the image is: '%s'\n", name);
-                        //Object graphicsObject = xGOnames.getByName(graphicNames[i]);
-                        XShape graphicShape = (XShape)
-                                UnoRuntime.queryInterface(XShape.class, xGOnames.getByName(name));
-                        XPropertySet textProps = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, graphicShape);
-                        String pictureURL = textProps.getPropertyValue("GraphicURL").toString();
-                        pictureURL = pictureURL.substring(27);  // Chop off the leading "vnd.sun.star.GraphicObject:"
-                        String outName = DecompUtil.constructBaseImageName(outputDir, 1, i);
-                        DecompUtil.extractImageByURL(xContext, xMCF, xCompDoc, pictureURL, outName);
-//                        printShapeProperties(graphicShape);
-//                        int replaceResult = replaceTextDocImage(xContext, xMCF, xCompDoc, xTextDoc, name, new String("file:///Users/kwc/Private/Pictures/Dogs/Haley-01.jpg"));
-//                        exportImage(xContext, xMCF, graphicShape, outputDir, 0, i);
-//                        storeImage(xContext, xMCF, xTextDoc, graphicShape, outputDir, 0, i);
-                    } catch (NoSuchElementException ex) {
-                        Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
-                    } catch (WrappedTargetException ex) {
-                        Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
-                    }
-
-                }
-            }
-        } catch (Exception ex) {
-            Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
-        }
-
-    }
-
-    /* Using indexes rather than names */
+    /* Extract Images using indexes rather than names */
     public static void extractImages(XComponentContext xContext,
                                      XMultiComponentFactory xMCF,
                                      XComponent xCompDoc,
@@ -160,10 +66,6 @@ public class DecompText {
         }
 
         try {
-//            XMultiServiceFactory xMSF = (XMultiServiceFactory) UnoRuntime.queryInterface(
-//                XMultiServiceFactory.class, xCompDoc);
-
-//            xGraphicProvider.storeGraphic(arg0, arg1);
             Object oGraphicProvider = xMCF.createInstanceWithContext(
                     "com.sun.star.graphic.GraphicProvider", xContext);
             XGraphicProvider xGraphicProvider = (XGraphicProvider)
