@@ -153,7 +153,11 @@ public class DecompUtil {
         XNameContainer bitMaps = (XNameContainer)
                 UnoRuntime.queryInterface(XNameContainer.class, xBitObj);
 
-        bitMaps.insertByName(imgName, srcUrl);
+        try {
+            bitMaps.insertByName(imgName, srcUrl);
+        } catch (com.sun.star.container.ElementExistException e) {
+            // Cool, it is already there!
+        }
         return (String) bitMaps.getByName(imgName);
     }
 
@@ -239,22 +243,20 @@ public class DecompUtil {
         Size aSize = xShape.getSize();
         Size citationSize = new Size();
 
-        citationSize.Height = 31 * 20;  // 400;  Image is 88x31 pixels  show it 20 times that size
-        citationSize.Width = 88 * 20; //aSize.Width;
+        citationSize.Width = 88 * 20; // Image is 88x31 pixels -- show it 20 times that size
+        citationSize.Height = 31 * 20;
         return citationSize;
     }
 
     // Assumes that the citation image shape is supplied
     public static Size calculateCitationTextSize(XShape xImage, XShape xCiteImage)
     {
-//        Point imagePos = xImage.getPosition();
         Size imageSize = xImage.getSize();
-//        Point citePos = xCiteImage.getPosition();
         Size citeSize = xCiteImage.getSize();
         Size citeTextSize = new Size();
 
-        citeTextSize.Height = citeSize.Height;
         citeTextSize.Width = imageSize.Width - citeSize.Width - 200;
+        citeTextSize.Height = citeSize.Height;
         return citeTextSize;
     }
 

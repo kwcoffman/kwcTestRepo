@@ -20,8 +20,8 @@ import com.sun.star.beans.UnknownPropertyException;
 import com.sun.star.drawing.XDrawPagesSupplier;
 import com.sun.star.drawing.XDrawPages;
 import com.sun.star.drawing.XDrawPage;
+import com.sun.star.drawing.XShapes;
 import com.sun.star.drawing.XShape;
-
 import com.sun.star.lang.XMultiComponentFactory;
 import com.sun.star.lang.XComponent;
 import com.sun.star.lang.IndexOutOfBoundsException;
@@ -257,20 +257,16 @@ public class DecompImpress {
             }
 
             XDrawPages xDrawPages = xDrawPagesSuppl.getDrawPages();
-//            Object pageObject = xDrawPages.getByIndex(p);
 
             System.out.printf("insertPresentationDocImageCitation: document has '%d' pages\n", xDrawPages.getCount());
 
-            XDrawPage drawPage =
-                    (XDrawPage) UnoRuntime.queryInterface(XDrawPage.class, xDrawPages.getByIndex(p));
-
+            XDrawPage drawPage = (XDrawPage) UnoRuntime.queryInterface(XDrawPage.class, xDrawPages.getByIndex(p));
 
             //put something on the drawpage
 
             System.out.printf("drawPage.getCount says there are %d objects\n", drawPage.getCount());
 
-            com.sun.star.drawing.XShapes xShapes = (com.sun.star.drawing.XShapes)
-                    UnoRuntime.queryInterface(com.sun.star.drawing.XShapes.class, drawPage);
+            XShapes xShapes = (XShapes) UnoRuntime.queryInterface(XShapes.class, drawPage);
 
             // Use the original image location and size to determine the location
             // and size (at least the width?) of the citation information
@@ -278,76 +274,45 @@ public class DecompImpress {
             Object oOrigImage = xShapes.getByIndex(s);
             XPropertySet xOrigPropSet = (XPropertySet)
                     UnoRuntime.queryInterface(XPropertySet.class, oOrigImage);
-//            printObjectProperties(oOrigImage);
+//            DecompUtil.printObjectProperties(oOrigImage);
             XShape xOrigImage = (XShape) UnoRuntime.queryInterface(XShape.class, oOrigImage);
-//            printShapeProperties(xOrigImage);
+//            DecompUtil.printShapeProperties(xOrigImage);
 
+            // Add citation image
+            String convertedURL = DecompUtil.getInternalURL(xCompDoc, citationURL, "image");
+
+            // Calculate citation image location using original image properties
             Point citeImagePos = DecompUtil.calculateCitationImagePosition(xOrigImage);
             Size citeImageSize = DecompUtil.calculateCitationImageSize(xOrigImage);
 
-            String convertedURL = DecompUtil.getInternalURL(xCompDoc, citationURL, "image");
+            XShape xCIShape = DecompUtil.createShape(xCompDoc, citeImagePos, citeImageSize,
+                                    "com.sun.star.drawing.GraphicObjectShape");
+            XPropertySet xImageProps = (XPropertySet)
+                    UnoRuntime.queryInterface(XPropertySet.class, xCIShape);
+            xImageProps.setPropertyValue("GraphicURL", convertedURL);
+            xShapes.add(xCIShape);
+            System.out.printf("drawPage.getCount nows says there are %d objects\n", drawPage.getCount());
 
-            try {
-                // Add citation image
-                XShape xCIShape = DecompUtil.createShape(xCompDoc, citeImagePos, citeImageSize,
-                                        "com.sun.star.drawing.GraphicObjectShape");
-                XPropertySet xImageProps = (XPropertySet)
-                UnoRuntime.queryInterface(XPropertySet.class, xCIShape);
-                xImageProps.setPropertyValue("GraphicURL", convertedURL);
-                xShapes.add(xCIShape);
-                System.out.printf("drawPage.getCount nows says there are %d objects\n", drawPage.getCount());
+            // Caclulate citation text location using citation image location
+            Point citeTextPos = DecompUtil.calculateCitationTextPosition(xCIShape);
+            Size citeTextSize = DecompUtil.calculateCitationTextSize(xOrigImage, xCIShape);
 
-                Point citeTextPos = DecompUtil.calculateCitationTextPosition(xCIShape);
-                Size citeTextSize = DecompUtil.calculateCitationTextSize(xOrigImage, xCIShape);
+            // Add citation text
+            XShape xCTShape = DecompUtil.createShape(xCompDoc, citeTextPos, citeTextSize,
+                                    "com.sun.star.drawing.TextShape");  // There is also a TextShape?
+            xShapes.add(xCTShape);
 
-                // Add citation text
-                XShape xCTShape = DecompUtil.createShape(xCompDoc, citeTextPos, citeTextSize,
-                                        "com.sun.star.drawing.TextShape");  // There is also a TextShape?
-                xShapes.add(xCTShape);
-/***
-                XPropertySet xCTProps = UnoRuntime.queryInterface(XPropertySet.class, xCTShape);
-                // blue fill color
-                xCTProps.setPropertyValue("FillColor", new Integer(0x00c000));
-                // black line color
-                xCTProps.setPropertyValue("LineColor", new Integer(0xffffff));
+            XText xText = (XText) UnoRuntime.queryInterface(XText.class, xCTShape);
+            XTextCursor xTextCursor = xText.createTextCursor();
+            XPropertySet xTxtProps = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, xTextCursor);
 
-                xCTProps.setPropertyValue("TextFitToSize", com.sun.star.drawing.TextFitToSizeType.PROPORTIONAL);
-                xCTProps.setPropertyValue("TextAutoGrowHeight", new Boolean(true));
-                xCTProps.setPropertyValue("TextAutoGrowWidth", new Boolean(true));
-***/
-/*
-                // blue fill color
-                xCTProps.setPropertyValue("FillColor", new Integer(0x0000C0));
-                // black line color
-                xCTProps.setPropertyValue("LineColor", new Integer(0x000000));
-                xCTProps.setPropertyValue("Name", "Rounded Gray Rectangle");
+            xTxtProps.setPropertyValue("CharHeight", 8);
+            xTxtProps.setPropertyValue("CharColor", new Integer(0xffffff));
+            xText.setString("http://open.umich.edu This is a long string to see what will happen with a large amount of text if the text is too long to fit within the rectangle.  We'll add even more text to see what happens when the smaller text exceeds the defined rectangle that is supposed to contain the text.");
+            //xTxtProps.setPropertyValue("HyperLinkURL", "http://open.umich.edu"); // XXX Doesn't work for impress documents.
+            //xText.setString("CC-BY");
 
-                //xCTProps.setPropertyValue("TextFitToSize", new Boolean(true));
-                xCTProps.setPropertyValue("TextFitToSize", com.sun.star.drawing.TextFitToSizeType.PROPORTIONAL);
-                //xCTProps.setPropertyValue("TextAutoGrowHeight", new Boolean(true));
-                xCTProps.setPropertyValue("TextAutoGrowHeight", true);
-                xCTProps.setPropertyValue("TextAutoGrowWidth", true);
-
-                xCTProps.setPropertyValue("CharColor", new Integer(0xCC0000));  //  XXX Doesn't do anything?
-                xCTProps.setPropertyValue("CharHeight", 4);  //  XXX Doesn't do anything?
-                //xCTProps.setPropertyValue("LineStyle", com.sun.star.drawing.LineStyle.NONE);
-                //xCTProps.setPropertyValue("FillStyle", com.sun.star.drawing.FillStyle.NONE);
-*/
-                XText xText = UnoRuntime.queryInterface(XText.class, xCTShape);
-                XTextCursor xTextCursor = xText.createTextCursor();
-                XPropertySet xTxtProps = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, xTextCursor);
-                
-                xTxtProps.setPropertyValue("CharHeight", 8);
-                xTxtProps.setPropertyValue("CharColor", new Integer(0xffffff));
-                xText.setString("http://open.umich.edu This is a long string to see what will happen with a large amount of text if the text is too long to fit within the rectangle.  We'll add even more text to see what happens when the smaller text exceeds the defined rectangle that is supposed to contain the text.");
-                //xTxtProps.setPropertyValue("HyperLinkURL", "http://open.umich.edu"); // XXX Doesn't work for impress documents.
-                //xText.setString("CC-BY");
-
-            } catch (java.lang.Exception ex) {
-                Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
-            }
-
-        } catch (Exception ex) {
+        } catch (java.lang.Exception ex) {
             Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
         }
         return 0;

@@ -7,6 +7,10 @@
 
 package edu.umich.med.umms;
 
+import com.sun.star.awt.Point;
+import com.sun.star.awt.Size;
+import com.sun.star.lang.IllegalArgumentException;
+import com.sun.star.lang.IndexOutOfBoundsException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -19,7 +23,11 @@ import com.sun.star.container.XNamed;
 import com.sun.star.container.NoSuchElementException;
 
 import com.sun.star.drawing.XDrawPage;
+import com.sun.star.drawing.XDrawPageSupplier;
+import com.sun.star.drawing.XDrawPages;
+import com.sun.star.drawing.XDrawPagesSupplier;
 import com.sun.star.drawing.XShape;
+import com.sun.star.drawing.XShapes;
 
 import com.sun.star.frame.XStorable;
 
@@ -33,17 +41,26 @@ import com.sun.star.graphic.XGraphicProvider;
 
 import com.sun.star.lib.uno.adapter.ByteArrayToXInputStreamAdapter;
 import com.sun.star.lib.uno.adapter.XOutputStreamToByteArrayAdapter;
+import com.sun.star.text.ControlCharacter;
+import com.sun.star.text.HoriOrientation;
+import com.sun.star.text.TextContentAnchorType;
+import com.sun.star.text.WrapTextMode;
+import com.sun.star.text.XParagraphCursor;
+import com.sun.star.text.XText;
 
 import com.sun.star.text.XTextContent;
+import com.sun.star.text.XTextCursor;
 import com.sun.star.text.XTextFramesSupplier;
 import com.sun.star.text.XTextDocument;
 import com.sun.star.text.XTextGraphicObjectsSupplier;
+import com.sun.star.text.XTextRange;
+import com.sun.star.text.XTextViewCursor;
+import com.sun.star.text.XTextViewCursorSupplier;
 
 import com.sun.star.uno.Any;
 import com.sun.star.uno.Exception;
 import com.sun.star.uno.UnoRuntime;
 import com.sun.star.uno.XComponentContext;
-
 
 
 /**
@@ -199,14 +216,280 @@ public class DecompText {
         return 0;
     }
 
-    /* XXX To be completed! */
+    // This places the button according to the Point and Size as specified.  I want it "inline" with the text
+    private static int insertLicenseButton(XComponentContext xContext,
+                                           XMultiComponentFactory xMCF,
+                                           XComponent xCompDoc,
+                                           String citationURL,
+                                           XText xText,
+                                           XParagraphCursor xCursor)
+    {
+        try {
+            String convertedURL = DecompUtil.getInternalURL(xCompDoc, citationURL, "image");
+
+            // From http://www.oooforum.org/forum/viewtopic.phtml?t=74008
+            XMultiServiceFactory xMSF = (XMultiServiceFactory) UnoRuntime.queryInterface(XMultiServiceFactory.class, xCompDoc);
+            Object xGraphic = xMSF.createInstance("com.sun.star.text.TextGraphicObject");
+            XTextContent xTextContent = (XTextContent) UnoRuntime.queryInterface(
+                    XTextContent.class, xGraphic);
+            XPropertySet xImageProps = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, xTextContent);
+
+            xImageProps.setPropertyValue("AnchorType", TextContentAnchorType.AS_CHARACTER);
+            xImageProps.setPropertyValue("GraphicURL", convertedURL);
+            xImageProps.setPropertyValue("Width", new Integer(88*20));
+            xImageProps.setPropertyValue("Height", new Integer(31*20));
+            xImageProps.setPropertyValue("TextWrap", WrapTextMode.DYNAMIC);
+            xImageProps.setPropertyValue("HoriOrient", HoriOrientation.LEFT);
+
+            xText.insertTextContent(xCursor, xTextContent, false);
+
+            return 0;
+        } catch (Exception ex) {
+            Logger.getLogger(DecompText.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (java.lang.Exception ex) {
+            Logger.getLogger(DecompText.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return 1;
+    }
+
+
     public static int insertImageCitation(XComponentContext xContext,
                                           XMultiComponentFactory xMCF,
                                           XComponent xCompDoc,
-                                          String originalImageName,
-                                          String replacementURL)
+                                          String citationURL,
+                                          int p,
+                                          int s)
     {
+        try {
+            XTextDocument xTextDoc = (XTextDocument) UnoRuntime.queryInterface(XTextDocument.class, xCompDoc);
+            if (xTextDoc == null) {
+                System.out.printf("Cannot get XTextDocument interface for Text Document???\n");
+                System.exit(7);
+            }
+
+            // Get reference to image in the document that is receiving citation information
+            Any xImageAny = null;
+            Object xImageObject = null;
+            try {
+                XTextGraphicObjectsSupplier xTGOS = (XTextGraphicObjectsSupplier) UnoRuntime.queryInterface(XTextGraphicObjectsSupplier.class, xTextDoc);
+                XNameAccess xNAGraphicObjects = xTGOS.getGraphicObjects();
+                XIndexAccess xEOIndexes = (XIndexAccess) UnoRuntime.queryInterface(XIndexAccess.class, xNAGraphicObjects);
+                //          xImageAny = (Any) xNAGraphicObjects.getByName(originalImageName);
+                xImageAny = (Any) xEOIndexes.getByIndex(s);
+            } catch (IndexOutOfBoundsException ex) {
+                Logger.getLogger(DecompText.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (WrappedTargetException ex) {
+                Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
+            }
+            if (xImageAny == null) {
+                return 1;
+            }
+            xImageObject = xImageAny.getObject();
+            XTextContent xImage = (XTextContent) xImageObject;
+
+
+            // This one successfully puts the text AFTER the image.  There must be a more straightforward way??
+            XTextRange imageRange = xImage.getAnchor();
+            XText xText = imageRange.getText();
+            XTextCursor xCursor = xText.createTextCursorByRange(imageRange);
+
+            XParagraphCursor xParaCursor = (XParagraphCursor) UnoRuntime.queryInterface(XParagraphCursor.class, xCursor);
+            xParaCursor.gotoEndOfParagraph(false);
+
+            // Insert "license button"
+
+            xText.insertControlCharacter(xParaCursor, ControlCharacter.PARAGRAPH_BREAK, false);
+            insertLicenseButton(xContext, xMCF, xCompDoc, citationURL, xText, xParaCursor);
+            xText.insertString(xParaCursor, "http://open.umich.edu ", false);
+            xText.insertString(xParaCursor, "This is a long string to see what will happen with a large amount of text if the text is ", false);
+            xText.insertString(xParaCursor, "too long to fit within the rectangle.  We'll add even more text to see what happens ", false);
+            xText.insertString(xParaCursor, "when the smaller text exceeds the defined rectangle that is supposed to contain the text.", false);
+            xText.insertControlCharacter(xParaCursor, ControlCharacter.PARAGRAPH_BREAK, false);
+
+        } catch (IllegalArgumentException ex) {
+            Logger.getLogger(DecompText.class.getName()).log(Level.SEVERE, null, ex);
+            return 1;
+        }
         return 0;
+    }
+
+
+    public static int insertImageCitationKindaWorks(XComponentContext xContext,
+                                          XMultiComponentFactory xMCF,
+                                          XComponent xCompDoc,
+                                          String citationURL,
+                                          int p,
+                                          int s)
+    {
+        try {
+            XTextDocument xTextDoc = (XTextDocument) UnoRuntime.queryInterface(XTextDocument.class, xCompDoc);
+            if (xTextDoc == null) {
+                System.out.printf("Cannot get XTextDocument interface for Text Document???\n");
+                System.exit(7);
+            }
+            Any xImageAny = null;
+            Object xImageObject = null;
+            try {
+                XTextGraphicObjectsSupplier xTGOS = (XTextGraphicObjectsSupplier) UnoRuntime.queryInterface(XTextGraphicObjectsSupplier.class, xTextDoc);
+                XNameAccess xNAGraphicObjects = xTGOS.getGraphicObjects();
+                XIndexAccess xEOIndexes = (XIndexAccess) UnoRuntime.queryInterface(XIndexAccess.class, xNAGraphicObjects);
+                //          xImageAny = (Any) xNAGraphicObjects.getByName(originalImageName);
+                xImageAny = (Any) xEOIndexes.getByIndex(s);
+            } catch (IndexOutOfBoundsException ex) {
+                Logger.getLogger(DecompText.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (WrappedTargetException ex) {
+                Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
+            }
+            if (xImageAny == null) {
+                return 1;
+            }
+            xImageObject = xImageAny.getObject();
+            XTextContent xImage = (XTextContent) xImageObject;
+            XTextRange origImageRange = xImage.getAnchor();
+            XTextRange imageRange = origImageRange.getEnd();
+
+            //XText xText = (XText) ((XTextDocument) UnoRuntime.queryInterface(XTextDocument.class, xCompDoc)).getText();
+            //XTextCursor xModelCursor = (XTextCursor) UnoRuntime.queryInterface(XTextCursor.class, xImage);
+//            XTextCursor xModelCursor = xText.createTextCursor();
+
+//            XParagraphCursor xParaCursor = (XParagraphCursor) UnoRuntime.queryInterface(XParagraphCursor.class, xModelCursor);
+//            xParaCursor.gotoEndOfParagraph(false);
+//            xParaCursor.gotoNextParagraph(false);
+//            xText.insertControlCharacter(xParaCursor, ControlCharacter.PARAGRAPH_BREAK, false);
+//            xText.insertString(xParaCursor, "http://open.umich.edu ", false);
+//            xText.insertString(xParaCursor, "This is a long string to see what will happen with a large amount of text if the text is ", false);
+//            xText.insertString(xParaCursor, "too long to fit within the rectangle.  We'll add even more text to see what happens ", false);
+//            xText.insertString(xParaCursor, "when the smaller text exceeds the defined rectangle that is supposed to contain the text.", false);
+//            xText.insertControlCharacter(xParaCursor, ControlCharacter.PARAGRAPH_BREAK, false);
+            XText xText = imageRange.getText();
+            xText.insertControlCharacter(imageRange, ControlCharacter.PARAGRAPH_BREAK, false);
+            xText.insertString(imageRange, "http://open.umich.edu ", false);
+            xText.insertString(imageRange, "This is a long string to see what will happen with a large amount of text if the text is ", false);
+            xText.insertString(imageRange, "too long to fit within the rectangle.  We'll add even more text to see what happens ", false);
+            xText.insertString(imageRange, "when the smaller text exceeds the defined rectangle that is supposed to contain the text.", false);
+            xText.insertControlCharacter(imageRange, ControlCharacter.PARAGRAPH_BREAK, false);
+
+        } catch (IllegalArgumentException ex) {
+            Logger.getLogger(DecompText.class.getName()).log(Level.SEVERE, null, ex);
+            return 1;
+        }
+        return 0;
+    }
+
+
+    /* XXX To be completed! To be changed to use index rather than name??? */
+    public static int insertImageCitation_Take_1(XComponentContext xContext,
+                                          XMultiComponentFactory xMCF,
+                                          XComponent xCompDoc,
+                                          String originalImageName,
+                                          String citationURL,
+                                          int p,
+                                          int s)
+    {
+        try {
+            XTextDocument xTextDoc = (XTextDocument) UnoRuntime.queryInterface(XTextDocument.class, xCompDoc);
+            if (xTextDoc == null) {
+                System.out.printf("Cannot get XTextDocument interface for Text Document???\n");
+                System.exit(7);
+            }
+/*  This is replaced by getImageObjectByName
+            Any aImage = null;
+            Object oImage = null;
+            try {
+                XTextGraphicObjectsSupplier xTGOS = (XTextGraphicObjectsSupplier) UnoRuntime.queryInterface(XTextGraphicObjectsSupplier.class, xTextDoc);
+                XNameAccess xNAGraphicObjects = xTGOS.getGraphicObjects();
+                aImage = (Any) xNAGraphicObjects.getByName(originalImageName);
+            } catch (NoSuchElementException ex) {
+                Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (WrappedTargetException ex) {
+                Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
+            }
+            if (aImage == null) {
+                return 1;
+            }
+*/
+
+            XDrawPage xDrawPage = getDrawPage(xCompDoc);
+            if (xDrawPage == null)
+                return 1;
+
+            XShapes xShapes = getXShapes(xDrawPage);
+            if (xShapes == null)
+                return 1;
+
+/*
+            Object oImage = getImageObjectByIndex(xTextDoc, s);
+//            Object oImage = getImageObjectByName(xTextDoc, originalImageName);
+            if (oImage == null)
+                return 1;
+            XTextContent xImage = (XTextContent) oImage;
+
+            // Use the original image location and size to determine the location
+            // and size (at least the width?) of the citation information
+            XPropertySet xOrigPropSet = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, oImage);
+            //            DecompUtil.printObjectProperties(oOrigImage);
+            XShape xOrigImage = (XShape) UnoRuntime.queryInterface(XShape.class, oImage);
+            //            DecompUtil.printShapeProperties(xOrigImage);
+*/
+            XShape xOrigImage = getXShapeByIndex(xContext, xMCF, xCompDoc, 1);
+            DecompUtil.printShapeProperties(xOrigImage);
+
+            XTextContent imageContent = (XTextContent) UnoRuntime.queryInterface(XTextContent.class, xOrigImage);
+            XTextRange imageRange = imageContent.getAnchor();
+//            XTextCursor docCursor = ((XTextViewCursorSupplier)UnoRuntime.queryInterface(XTextViewCursorSupplier.class, xTextDoc.getCurrentController())).getViewCursor();
+
+/*
+            Point citeImagePos = DecompUtil.calculateCitationImagePosition(xOrigImage);
+            Size citeImageSize = DecompUtil.calculateCitationImageSize(xOrigImage);
+            String convertedURL = DecompUtil.getInternalURL(xCompDoc, citationURL, "image");
+
+            XShape xCIShape = DecompUtil.createShape(xCompDoc, citeImagePos, citeImageSize,
+                                    "com.sun.star.drawing.GraphicObjectShape");
+            XPropertySet xImageProps = (XPropertySet)
+                    UnoRuntime.queryInterface(XPropertySet.class, xCIShape);
+            xImageProps.setPropertyValue("GraphicURL", convertedURL);
+            xShapes.add(xCIShape);
+
+            // Caclulate citation text location using citation image location
+            Point citeTextPos = DecompUtil.calculateCitationTextPosition(xCIShape);
+            Size citeTextSize = DecompUtil.calculateCitationTextSize(xOrigImage, xCIShape);
+
+            // Add citation text
+            XShape xCTShape = DecompUtil.createShape(xCompDoc, citeTextPos, citeTextSize,
+                                    "com.sun.star.drawing.TextShape");  // There is also a TextShape?
+            xShapes.add(xCTShape);
+
+            XText xText = UnoRuntime.queryInterface(XText.class, xCTShape);
+            XTextCursor xTextCursor = xText.createTextCursor();
+            XPropertySet xTxtProps = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, xTextCursor);
+
+            xTxtProps.setPropertyValue("CharHeight", 8);
+            xTxtProps.setPropertyValue("CharColor", new Integer(0xffffff));
+            xText.setString("http://open.umich.edu This is a long string to see what will happen with a large amount of text if the text is too long to fit within the rectangle.  We'll add even more text to see what happens when the smaller text exceeds the defined rectangle that is supposed to contain the text.");
+*/
+            //docCursor.gotoStart(false);
+            //docCursor.gotoRange(xOrigImage., false);
+            // Get View Cursor
+            XText xText = xTextDoc.getText();
+            // Get Model Cursor
+            XTextCursor xModelCursor = xText.createTextCursorByRange(imageRange);
+
+            xText.insertControlCharacter(xModelCursor, ControlCharacter.PARAGRAPH_BREAK, false);
+            xText.insertString(xModelCursor, "http://open.umich.edu ", false);
+            xText.insertString(xModelCursor, "This is a long string to see what will happen with a large amount of text if the text is ", false);
+            xText.insertString(xModelCursor, "too long to fit within the rectangle.  We'll add even more text to see what happens ", false);
+            xText.insertString(xModelCursor, "when the smaller text exceeds the defined rectangle that is supposed to contain the text.", false);
+            xText.insertControlCharacter(xModelCursor, ControlCharacter.PARAGRAPH_BREAK, false);
+
+
+            return 0;
+        } catch (Exception ex) {
+            Logger.getLogger(DecompText.class.getName()).log(Level.SEVERE, null, ex);
+            return 1;
+        } catch (java.lang.Exception ex) {
+            Logger.getLogger(DecompText.class.getName()).log(Level.SEVERE, null, ex);
+            return 1;
+        }
     }
 
 
@@ -303,9 +586,51 @@ public class DecompText {
             Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
         }
         if (xImageAny == null) {
-            return 1;
+            return null;
         }
         return xImageAny.getObject();
+    }
+
+/*
+    private static Object getImageObjectByIndex(XComponent xTextDoc, int x)
+    {
+        Any xImageAny = null;
+        Object xImageObject = null;
+        try {
+            XTextGraphicObjectsSupplier xTGOS = (XTextGraphicObjectsSupplier) UnoRuntime.queryInterface(XTextGraphicObjectsSupplier.class, xTextDoc);
+            XNameAccess xNAGraphicObjects = xTGOS.getGraphicObjects();
+            xImageAny = (Any) xNAGraphicObjects.getByName(name);
+        } catch (NoSuchElementException ex) {
+            Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (WrappedTargetException ex) {
+            Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        if (xImageAny == null) {
+            return null;
+        }
+        return xImageAny.getObject();
+    }
+*/
+    private static XShape getXShapeByIndex(XComponentContext xContext,
+                                           XMultiComponentFactory xMCF,
+                                           XComponent xCompDoc,
+                                           int x)
+    {
+        try {
+            Object oGraphicProvider = xMCF.createInstanceWithContext("com.sun.star.graphic.GraphicProvider", xContext);
+            XGraphicProvider xGraphicProvider = (XGraphicProvider) UnoRuntime.queryInterface(XGraphicProvider.class, oGraphicProvider);
+            XTextGraphicObjectsSupplier xTextGOS = (XTextGraphicObjectsSupplier) UnoRuntime.queryInterface(XTextGraphicObjectsSupplier.class, xCompDoc);
+            XNameAccess xEONames = xTextGOS.getGraphicObjects();
+            XIndexAccess xEOIndexes = (XIndexAccess) UnoRuntime.queryInterface(XIndexAccess.class, xEONames);
+            if (DecompUtil.beingVerbose()) {
+                System.out.printf("There are %d GraphicsObjects in this document\n", xEOIndexes.getCount());
+            }
+            XShape graphicShape = (XShape) UnoRuntime.queryInterface(XShape.class, xEOIndexes.getByIndex(x));
+            return graphicShape;
+        } catch (Exception ex) {
+            Logger.getLogger(DecompText.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return null;
     }
 
     private static void storeImage(XComponentContext xContext,
@@ -356,6 +681,26 @@ public class DecompText {
         } finally {
             return xDP;
         }
+    }
+
+    private static XDrawPage getDrawPage(XComponent xCompDoc)
+    {
+            XDrawPageSupplier xDrawPageSuppl =
+                    (XDrawPageSupplier) UnoRuntime.queryInterface(XDrawPageSupplier.class, xCompDoc);
+            if (xDrawPageSuppl == null) {
+                System.out.println("Failed to get xDrawPageSuppl from xComp");
+                return null;
+            }
+
+            XDrawPage xDrawPage = xDrawPageSuppl.getDrawPage();
+            return xDrawPage;
+
+    }
+
+    private static XShapes getXShapes(XDrawPage xDrawPage)
+    {
+        XShapes xShapes = (XShapes) UnoRuntime.queryInterface(XShapes.class, xDrawPage);
+        return xShapes;
     }
 
 }

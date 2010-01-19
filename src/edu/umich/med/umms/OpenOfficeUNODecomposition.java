@@ -168,7 +168,10 @@ public class OpenOfficeUNODecomposition {
                     if (functionImageReplacement) {
                         DecompText.replaceImage(xContext, xMCF, xCompDoc, "xxxorigname", DecompUtil.fileNameToOOoURL(repImageFile));
                     } else if (functionCitationInsertion) {
-                        DecompText.insertImageCitation(xContext, xMCF, xCompDoc, "xxxorigname", DecompUtil.fileNameToOOoURL(citeImageFile));
+                        //DecompText.insertImageCitation(xContext, xMCF, xCompDoc, DecompUtil.fileNameToOOoURL(citeImageFile), repPageNum, repImageNum);
+                        DecompText.insertImageCitation(xContext, xMCF, xCompDoc, DecompUtil.fileNameToOOoURL(citeImageFile), repPageNum, 0);
+                        DecompText.insertImageCitation(xContext, xMCF, xCompDoc, DecompUtil.fileNameToOOoURL(citeImageFile), repPageNum, 2);
+                        DecompText.insertImageCitation(xContext, xMCF, xCompDoc, DecompUtil.fileNameToOOoURL(citeImageFile), repPageNum, 1);
                     } else if (functionExtractImages) {
                         DecompText.extractImages(xContext, xMCF, xCompDoc, outputDir);
                     }
