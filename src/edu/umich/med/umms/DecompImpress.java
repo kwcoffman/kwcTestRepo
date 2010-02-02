@@ -20,6 +20,8 @@ import com.sun.star.beans.UnknownPropertyException;
 import com.sun.star.drawing.XDrawPagesSupplier;
 import com.sun.star.drawing.XDrawPages;
 import com.sun.star.drawing.XDrawPage;
+import com.sun.star.drawing.XDrawPageDuplicator;
+import com.sun.star.drawing.XMasterPageTarget;
 import com.sun.star.drawing.XShapes;
 import com.sun.star.drawing.XShape;
 import com.sun.star.lang.XMultiComponentFactory;
@@ -237,34 +239,106 @@ public class DecompImpress {
         return 0;
     }
 
-    /* XXX  To be completed
-       http://www.oooforum.org/forum/viewtopic.phtml?t=45734
-     */
+   public static int insertFullCitation(XComponentContext xContext,
+                                        XMultiComponentFactory xMCF,
+                                        XComponent xCompDoc,
+                                        int p,     // Cited image page number
+                                        int s,     // Cited image shape number
+                                        int cp,    // citation page number
+                                        String citationString,
+                                        String citationLicense,
+                                        String citationLicenseBadgeURL)
+   {
+        try {
+
+            XDrawPage xNewPage = createCitationPage(xCompDoc);
+
+            XShape titleShape = DecompUtil.createShape(xCompDoc, new Point(2000, 2000), new Size(20000, 20000), "com.sun.star.presentation.TitleTextShape");
+            XText titleText = (XText) UnoRuntime.queryInterface(XText.class, titleShape);
+            xNewPage.add(titleShape);
+            titleText.setString("Works Cited");
+
+            // Note that the order of operations here is important!!
+            for (int i = 0; i < 10; i++) {
+                XShape citationShape = DecompUtil.createShape(xCompDoc, new Point(2000, 4000+(i*1000)), new Size(20000, 10), "com.sun.star.drawing.TextShape");
+                xNewPage.add(citationShape);
+                XText citationText = (XText) UnoRuntime.queryInterface(XText.class, citationShape);
+                XTextCursor xTextCursor = citationText.createTextCursor();
+                XPropertySet xTxtProps = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, xTextCursor);
+                xTxtProps.setPropertyValue("CharHeight", 8);
+                citationText.setString(citationString + ", " + citationLicense + ", " + citationLicenseBadgeURL);
+            }
+
+        } catch (java.lang.Exception ex) {
+            Logger.getLogger(DecompImpress.class.getName()).log(Level.SEVERE, null, ex);
+            return 1;
+        }
+        return 0;
+   }
+
+
+   private static XDrawPage createCitationPage(XComponent xCompDoc)
+   {
+       XDrawPage newPage = null;
+        XDrawPage dupPage = null;
+        try {
+            XDrawPagesSupplier xDrawPagesSuppl = (XDrawPagesSupplier) UnoRuntime.queryInterface(XDrawPagesSupplier.class, xCompDoc);
+            if (xDrawPagesSuppl == null) {
+                //System.out.println("Failed to get xDrawPagesSuppl from xComp");
+                return null;
+            }
+            XDrawPages xDrawPages = xDrawPagesSuppl.getDrawPages();
+            int currentCount = xDrawPages.getCount();
+            newPage = xDrawPages.insertNewByIndex(currentCount);
+
+
+            /*
+            Object oLastPage = xDrawPages.getByIndex(currentCount - 1);
+            XDrawPage xLastPage = (XDrawPage) UnoRuntime.queryInterface(XDrawPage.class, oLastPage);
+
+            XMasterPageTarget xMaster = (XMasterPageTarget) UnoRuntime.queryInterface(XMasterPageTarget.class, xLastPage);
+            XDrawPage masterPage = xMaster.getMasterPage();
+            XDrawPageDuplicator xDuplicator = (XDrawPageDuplicator) UnoRuntime.queryInterface(XDrawPageDuplicator.class, xDrawPagesSuppl);
+            dupPage = xDuplicator.duplicate(masterPage);
+
+//            for (int i = currentCount - 1; i >= 0; i--) {
+//                Object oPage = xDrawPages.getByIndex(i);
+//                XDrawPage xPage = (XDrawPage) UnoRuntime.queryInterface(XDrawPage.class, oPage);
+//                xDuplicator.duplicate(xPage);
+//            }
+            //xDuplicator.duplicate(xLastPage);
+             *
+        } catch (IndexOutOfBoundsException ex) {
+            Logger.getLogger(DecompImpress.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (WrappedTargetException ex) {
+            Logger.getLogger(DecompImpress.class.getName()).log(Level.SEVERE, null, ex);
+             */
+        } finally {
+            return newPage;
+        }
+   }
+
+   /* XXX  To be completed
+      http://www.oooforum.org/forum/viewtopic.phtml?t=45734
+    */
     public static int insertImageCitation(XComponentContext xContext,
                                           XMultiComponentFactory xMCF,
                                           XComponent xCompDoc,
-                                          String originalImageName,
                                           String citationURL,
                                           int p,
                                           int s)
     {
         try {
-            XDrawPagesSupplier xDrawPagesSuppl =
-                    (XDrawPagesSupplier) UnoRuntime.queryInterface(XDrawPagesSupplier.class, xCompDoc);
-            if (xDrawPagesSuppl == null) {
-                System.out.println("Failed to get xDrawPagesSuppl from xComp");
+
+            /* XXX Just testing this here! XXX */
+            insertFullCitation(xContext, xMCF, xCompDoc, 2, 3, 0, "This is the full citation string with enough text to hopefully be required to wrap around to a second line so we can see what that looks like!", "This is the License info", "http://badge.url");
+            /* XXX Just testing this here! XXX */
+
+            XDrawPage drawPage = getDrawPageByIndex(xCompDoc, p);
+            if (drawPage == null)
                 return 1;
-            }
 
-            XDrawPages xDrawPages = xDrawPagesSuppl.getDrawPages();
-
-            System.out.printf("insertPresentationDocImageCitation: document has '%d' pages\n", xDrawPages.getCount());
-
-            XDrawPage drawPage = (XDrawPage) UnoRuntime.queryInterface(XDrawPage.class, xDrawPages.getByIndex(p));
-
-            //put something on the drawpage
-
-            System.out.printf("drawPage.getCount says there are %d objects\n", drawPage.getCount());
+            //System.out.printf("drawPage.getCount says there are %d objects\n", drawPage.getCount());
 
             XShapes xShapes = (XShapes) UnoRuntime.queryInterface(XShapes.class, drawPage);
 
@@ -314,10 +388,25 @@ public class DecompImpress {
 
         } catch (java.lang.Exception ex) {
             Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
+            return 1;
         }
         return 0;
     }
 
+
+    private static XDrawPage getDrawPageByIndex(XComponent xCompDoc, int nIndex)
+    {
+        XDrawPagesSupplier xDrawPagesSuppl =
+                (XDrawPagesSupplier) UnoRuntime.queryInterface(XDrawPagesSupplier.class, xCompDoc);
+        if (xDrawPagesSuppl == null) {
+            //System.out.println("Failed to get xDrawPagesSuppl from xComp");
+            return null;
+        }
+
+        XDrawPages xDrawPages = xDrawPagesSuppl.getDrawPages();
+
+        return getDrawPage(xDrawPages, nIndex);
+    }
 
     private static XDrawPage getDrawPage(XDrawPages xDrawPages, int nIndex)
     {
@@ -345,6 +434,11 @@ public class DecompImpress {
         } finally {
             return xShape;
         }
+    }
+
+    private static int insertLicenseButton()
+    {
+        return 0;
     }
 
 }

@@ -111,6 +111,28 @@ public class DecompText {
         }
     }
 
+    private static Object getImageObject(XTextDocument xTextDoc, int s)
+    {
+        // Get reference to image object in the text document
+        Any xImageAny = null;
+        try {
+            XTextGraphicObjectsSupplier xTGOS = (XTextGraphicObjectsSupplier) UnoRuntime.queryInterface(XTextGraphicObjectsSupplier.class, xTextDoc);
+            XNameAccess xNAGraphicObjects = xTGOS.getGraphicObjects();
+            XIndexAccess xEOIndexes = (XIndexAccess) UnoRuntime.queryInterface(XIndexAccess.class, xNAGraphicObjects);
+            //          xImageAny = (Any) xNAGraphicObjects.getByName(originalImageName);
+            xImageAny = (Any) xEOIndexes.getByIndex(s);
+        } catch (IndexOutOfBoundsException ex) {
+            Logger.getLogger(DecompText.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (WrappedTargetException ex) {
+            Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        if (xImageAny == null) {
+            return null;
+        }
+        return xImageAny.getObject();
+    }
+
+
     // XXX Revise this to use index value rather than a name !?!?!?!?!? XXX
     /* From http://www.oooforum.org/forum/viewtopic.phtml?t=81870 */
     public static int replaceImage(XComponentContext xContext,
@@ -252,7 +274,6 @@ public class DecompText {
         return 1;
     }
 
-
     public static int insertImageCitation(XComponentContext xContext,
                                           XMultiComponentFactory xMCF,
                                           XComponent xCompDoc,
@@ -266,26 +287,10 @@ public class DecompText {
                 System.out.printf("Cannot get XTextDocument interface for Text Document???\n");
                 System.exit(7);
             }
-
-            // Get reference to image in the document that is receiving citation information
-            Any xImageAny = null;
-            Object xImageObject = null;
-            try {
-                XTextGraphicObjectsSupplier xTGOS = (XTextGraphicObjectsSupplier) UnoRuntime.queryInterface(XTextGraphicObjectsSupplier.class, xTextDoc);
-                XNameAccess xNAGraphicObjects = xTGOS.getGraphicObjects();
-                XIndexAccess xEOIndexes = (XIndexAccess) UnoRuntime.queryInterface(XIndexAccess.class, xNAGraphicObjects);
-                //          xImageAny = (Any) xNAGraphicObjects.getByName(originalImageName);
-                xImageAny = (Any) xEOIndexes.getByIndex(s);
-            } catch (IndexOutOfBoundsException ex) {
-                Logger.getLogger(DecompText.class.getName()).log(Level.SEVERE, null, ex);
-            } catch (WrappedTargetException ex) {
-                Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
-            }
-            if (xImageAny == null) {
+            XTextContent xImage = (XTextContent) getImageObject(xTextDoc, s);
+            if (xImage == null) {
                 return 1;
             }
-            xImageObject = xImageAny.getObject();
-            XTextContent xImage = (XTextContent) xImageObject;
 
 
             // This one successfully puts the text AFTER the image.  There must be a more straightforward way??
@@ -313,6 +318,31 @@ public class DecompText {
         return 0;
     }
 
+    public static int insertImageCitationsAsReferences(XComponentContext xContext,
+                                                       XMultiComponentFactory xMCF,
+                                                       XComponent xCompDoc,
+                                                       String citationString,
+                                                       String citationURL,
+                                                       int p,
+                                                       int s)
+    {
+        // XXX Somehow... need to find button image file name and citation text for each image...
+
+        XTextDocument xTextDoc = (XTextDocument) UnoRuntime.queryInterface(XTextDocument.class, xCompDoc);
+        if (xTextDoc == null) {
+            System.out.printf("Cannot get XTextDocument interface for Text Document???\n");
+            System.exit(7);
+        }
+        XTextContent xImage = (XTextContent) getImageObject(xTextDoc, s);
+        if (xImage == null) {
+            return 1;
+        }
+
+
+        /* XXX FINISH THIS FOR TEXT DOCUMENTS */
+        
+        return 0;
+    }
 
     public static int insertImageCitationKindaWorks(XComponentContext xContext,
                                           XMultiComponentFactory xMCF,
