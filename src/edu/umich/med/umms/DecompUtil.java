@@ -63,6 +63,7 @@ import com.sun.star.ucb.XSimpleFileAccess2;
 import com.sun.star.uno.Exception;
 import com.sun.star.uno.UnoRuntime;
 import com.sun.star.uno.XComponentContext;
+import java.util.UUID;
 
 
 /**
@@ -73,6 +74,7 @@ public class DecompUtil {
 
     private static boolean verbose = false;
     private static boolean excludeCustomShapes = false;
+    private static final com.spinn3r.log5j.Logger mylog = com.spinn3r.log5j.Logger.getLogger();
 
     public static boolean beingVerbose()
     {
@@ -94,7 +96,12 @@ public class DecompUtil {
         excludeCustomShapes = true;
     }
 
-    public static XComponent openFileForProcessing(XDesktop xDesktop, String inputFile)
+    public static void initializeLogging()
+    {
+
+    }
+
+    public static XComponent openFileForProcessing(XDesktop xDesktop, String inputFileUrl) throws java.lang.Exception
     {
         // Set up to load the document
         PropertyValue propertyValues[] = new PropertyValue[3];
@@ -116,22 +123,13 @@ public class DecompUtil {
 
         // Load the document
         //System.out.print("Opening file '" + sFileName + "' ... ");
-        String sFileUrl = fileNameToOOoURL(inputFile);
+        //String sFileUrl = fileNameToOOoURL(inputFile);
 
         XComponentLoader xCompLoader = (XComponentLoader)
                 UnoRuntime.queryInterface(XComponentLoader.class, xDesktop);
 
 
-        XComponent xCompDoc = null;
-        try {
-            xCompDoc = xCompLoader.loadComponentFromURL(
-                sFileUrl, "_blank", 0, propertyValues);
-        } catch (java.lang.Exception e) {
-            System.out.printf("Failed to open file '%s', error was '%s'\n",
-                    inputFile, e.getMessage());
-            System.exit(2);
-        }
-        return xCompDoc;
+        return xCompLoader.loadComponentFromURL(inputFileUrl, "_blank", 0, propertyValues);
     }
 
     public static XPropertySet duplicateObjectPropertySet(Object origObj)
@@ -182,15 +180,15 @@ public class DecompUtil {
         // Get and print all the shape's properties
         XPropertySet xShapeProperties = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, shape);
         Property[] props = xShapeProperties.getPropertySetInfo().getProperties();
-        System.out.println("----- Printing Shape Properties -----");
+        mylog.info("----- Printing Shape Properties -----");
         for (int x = 0; x < props.length; x++) {
             try {
-                System.out.println("    Property " + props[x].Name + " = " + xShapeProperties.getPropertyValue(props[x].Name));
+                mylog.info("    Property " + props[x].Name + " = " + xShapeProperties.getPropertyValue(props[x].Name));
             } catch (UnknownPropertyException ex) {
                 Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
-        System.out.println();
+        mylog.info("");
 
     }
 
@@ -200,15 +198,15 @@ public class DecompUtil {
         // Get and print all the shape's properties
         XPropertySet xShapeProperties = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, obj);
         Property[] props = xShapeProperties.getPropertySetInfo().getProperties();
-        System.out.println("----- Printing Object Properties -----");
+        mylog.info("----- Printing Object Properties -----");
         for (int x = 0; x < props.length; x++) {
             try {
-                System.out.println("    Property " + props[x].Name + " = " + xShapeProperties.getPropertyValue(props[x].Name));
+                mylog.info("    Property " + props[x].Name + " = " + xShapeProperties.getPropertyValue(props[x].Name));
             } catch (UnknownPropertyException ex) {
                 Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
-        System.out.println();
+        mylog.info("");
 
     }
 
@@ -267,9 +265,9 @@ public class DecompUtil {
             if (xServiceInfo != null) {
                 String[] svcNames = xServiceInfo.getSupportedServiceNames();
                 if (svcNames.length > 0)
-                    System.out.println("This document supports the following services:");
+                    mylog.debug("This document supports the following services:");
                 for (int i = 0; i < svcNames.length; i++) {
-                    System.out.printf("\t%s\n", svcNames[i]);
+                    mylog.debug("\t%s\n", svcNames[i]);
                 }
             }
     }
@@ -288,9 +286,9 @@ public class DecompUtil {
                 Object shapeURLObj = shapeProps.getPropertyValue("GraphicURL");
                 String shapeURL = shapeURLObj.toString();
 
-            //System.out.printf("The URL for this shape is '%s'\n", shapeURL);
+            //mylog.debug("The URL for this shape is '%s'\n", shapeURL);
             } catch (Exception e) {
-                System.out.printf("Unable to get GraphicURL property for context image: '%s'\n", e.getMessage());
+                mylog.error("Unable to get GraphicURL property for context image: '%s'\n", e.getMessage());
             }
         }
  */
@@ -305,7 +303,7 @@ public class DecompUtil {
         outProps[1].Name = "URL";
         outProps[1].Value = "file://" + fname;
 
-        if (verbose) System.out.printf("Exporting page %d to file '%s'\n", p, fname);
+        mylog.debug("Exporting page %d to file '%s'\n", p, fname);
 
         try {
 
@@ -319,7 +317,7 @@ public class DecompUtil {
             xFilter.filter(outProps);
 
         } catch (Exception e) {
-            System.out.println("Caught Exception exporting image:" + e.getMessage());
+            mylog.error("Caught Exception exporting image:" + e.getMessage());
         }
     }
 
@@ -337,9 +335,9 @@ public class DecompUtil {
 //            Object shapeURLObj = shapeProps.getPropertyValue("GraphicURL");
 //            String shapeURL = shapeURLObj.toString();
 //
-//            //System.out.printf("The URL for this shape is '%s'\n", shapeURL);
+//            //mylog.debug("The URL for this shape is '%s'\n", shapeURL);
 //        } catch (Exception e) {
-//            System.out.printf("Unable to get GraphicURL property for object: '%s'\n", e.getMessage());
+//            mylog.debug("Unable to get GraphicURL property for object: '%s'\n", e.getMessage());
 //        }
 
         String fname = String.format("%s/%s-%05d-%03d.%s", outputDir, "image", p, s, "png");
@@ -356,7 +354,7 @@ public class DecompUtil {
         outProps[1].Name = "URL";
         outProps[1].Value = fileNameToOOoURL(fname);
 
-        if (verbose) System.out.printf("Exporting shape %d from page %d to file '%s'\n", s, p, fname);
+        mylog.debug("Exporting shape %d from page %d to file '%s'\n", s, p, fname);
 
         try {
 
@@ -370,7 +368,7 @@ public class DecompUtil {
             xFilter.filter(outProps);
 
         } catch (Exception e) {
-            System.out.println("Caught Exception exporting image: " + e.getMessage());
+            mylog.error("Caught Exception exporting image: " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -398,11 +396,11 @@ public class DecompUtil {
 
             String[] allNames = xDocStorageNameAccess.getElementNames();
 //            for (int i = 0; i < allNames.length; i++) {
-//                System.out.printf("The big list has name '%s'\n", allNames[i]);
+//                mylog.debug("The big list has name '%s'\n", allNames[i]);
 //            }
 
             if (!xDocStorageNameAccess.hasByName("Pictures")) {
-                System.out.printf("Found no \"Pictures\" in the document!!!\n");
+                mylog.debug("Found no \"Pictures\" in the document!!!\n");
                 return;
             }
 
@@ -411,10 +409,10 @@ public class DecompUtil {
                     UnoRuntime.queryInterface(XNameAccess.class, oPicturesStorage);
 
             String[] aNames = xPicturesNameAccess.getElementNames();
-            if (DecompUtil.beingVerbose()) System.out.printf("There were a total of %d pictures found via DocStorageAccess\n", aNames.length);
+            mylog.debug("There were a total of %d pictures found via DocStorageAccess\n", aNames.length);
             for (int i = 0; i < aNames.length; i++) {
-                //System.out.printf("Picture %d has name '%s'\n", i+1, aNames[i]);
-                //System.out.printf("Processing picture with name '%s'\n", aNames[i]);
+                //mylog.debug("Picture %d has name '%s'\n", i+1, aNames[i]);
+                //mylog.debug("Processing picture with name '%s'\n", aNames[i]);
                 if (aNames[i].contains(pictureURL)) {
                     Object oElement = xPicturesNameAccess.getByName(aNames[i]);
                     XStream xStream = (XStream) UnoRuntime.queryInterface(XStream.class, oElement);
@@ -448,14 +446,14 @@ public class DecompUtil {
         }
 
         if(oInterface == null) {
-              System.err.println("__FUNCTION__: unable to create TypeDetection service");
+              mylog.error("__FUNCTION__: unable to create TypeDetection service");
         }
 
         XTypeDetection m_xDetection = (XTypeDetection)
                 UnoRuntime.queryInterface(XTypeDetection.class, oInterface);
 
         // queryTypeByURL does a "flat" detection of filetype (looking at the suffix???)
-        System.out.println("queryTypeByURL says '"
+        mylog.debug("queryTypeByURL says '"
                 + sURL + "' is of type: '" +
                 m_xDetection.queryTypeByURL(sURL) +"'");
 
@@ -465,7 +463,7 @@ public class DecompUtil {
         testProps[0][0].Name = "URL";
         testProps[0][0].Value = sURL;
 
-        System.out.println("queryTypeByDescriptor says '" +
+        mylog.debug("queryTypeByDescriptor says '" +
                 sURL + "' is of type: '" +
                 m_xDetection.queryTypeByDescriptor(testProps, false) +"'");
 
@@ -485,7 +483,7 @@ public class DecompUtil {
         }
 
         if(oInterface == null) {
-              System.err.println("__FUNCTION__: unable to create TypeDetection service");
+              mylog.error("__FUNCTION__: unable to create TypeDetection service");
               return null;
         }
 
@@ -502,7 +500,13 @@ public class DecompUtil {
     }
 
     public static String fileNameToOOoURL(final String fName) {
-        StringBuilder sLoadUrl = new StringBuilder("file://");
+        StringBuilder sLoadUrl;
+
+        // XXX Consider the case where we actually get a URL in
+        if (fName.contains("://"))
+            sLoadUrl = new StringBuilder();
+        else
+            sLoadUrl = new StringBuilder("file://");
         sLoadUrl.append(fName.replace('\\', '/'));
         return sLoadUrl.toString();
     }
@@ -510,11 +514,11 @@ public class DecompUtil {
     public static void storeDocument(XComponentContext xContext,
                                       XMultiComponentFactory xMCF,
                                       XComponent xCompDoc,
-                                      String newFName,
+                                      String newFNameUrl,
                                       String filterName)
     {
-        String newFNameURL = fileNameToOOoURL(newFName);
-        if (verbose) System.out.printf("Storing to '%s' using URL '%s'\n", newFName, newFNameURL);
+        //String newFNameURL = fileNameToOOoURL(newFName);
+        mylog.debug("Storing file using URL '%s'\n", newFNameUrl);
 
         XStorable xStorable = (XStorable) UnoRuntime.queryInterface(XStorable.class, xCompDoc);
         PropertyValue[] propertyValue = new PropertyValue[3];
@@ -533,9 +537,9 @@ public class DecompUtil {
         propertyValue[1].Value = outputStream;
         try {
 //          xStorable.storeAsURL(newFNameURL, propertyValue);
-            xStorable.storeToURL(newFNameURL, propertyValue);
+            xStorable.storeToURL(newFNameUrl, propertyValue);
         } catch (com.sun.star.io.IOException ex) {
-            System.out.println("Storing document: " + ex.getMessage());
+            mylog.error("Storing document: " + ex.getMessage());
             ex.printStackTrace();
         }
 
@@ -576,10 +580,11 @@ public class DecompUtil {
         }
 
         // XXX Need proper code to generate a random name!!!
-        newName = new String("/tmp/foobar_thisshouldberandom_" + "xyz123" + "." + nativeFormat.getFileExtension());
+        newName = new String("/tmp/" + UUID.randomUUID().toString() + "." + nativeFormat.getFileExtension());
+//        newName = new String("/tmp/foobar_thisshouldberandom_" + "xyz123" + "." + nativeFormat.getFileExtension());
 
         // Save in OO format and return the name of the temporary file
-        storeDocument(xContext, xMCF, xCompOrigDoc, newName, nativeFormat.getFilterName());
+        storeDocument(xContext, xMCF, xCompOrigDoc, fileNameToOOoURL(newName), nativeFormat.getFilterName());
         // Get current file type and determine if we need to save it in OO format
 
         return newName;

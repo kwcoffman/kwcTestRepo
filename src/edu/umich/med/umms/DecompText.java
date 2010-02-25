@@ -68,6 +68,7 @@ import com.sun.star.uno.XComponentContext;
  * @author kwc@umich.edu
  */
 public class DecompText {
+    private static final com.spinn3r.log5j.Logger mylog = com.spinn3r.log5j.Logger.getLogger();
 
     /* Extract Images using indexes rather than names */
     public static void extractImages(XComponentContext xContext,
@@ -78,7 +79,7 @@ public class DecompText {
         XTextDocument xTextDoc =
                     (XTextDocument) UnoRuntime.queryInterface(XTextDocument.class, xCompDoc);
         if (xTextDoc == null) {
-            System.out.printf("Cannot get XTextDocument interface for Text Document???\n");
+            mylog.error("Cannot get XTextDocument interface for Text Document???\n");
             System.exit(7);
         }
 
@@ -93,7 +94,7 @@ public class DecompText {
             XNameAccess xEONames = xTextGOS.getGraphicObjects();
             XIndexAccess xEOIndexes = (XIndexAccess)
                     UnoRuntime.queryInterface(XIndexAccess.class, xEONames);
-            if (DecompUtil.beingVerbose()) System.out.printf("There are %d GraphicsObjects in this document\n", xEOIndexes.getCount());
+            mylog.debug("There are %d GraphicsObjects in this document\n", xEOIndexes.getCount());
 
             for (int i = 0; i < xEOIndexes.getCount(); i++) {
                 //Object oTextEO = xEOIndexes.getByIndex(i);
@@ -145,7 +146,7 @@ public class DecompText {
         XTextDocument xTextDoc =
                     (XTextDocument) UnoRuntime.queryInterface(XTextDocument.class, xCompDoc);
         if (xTextDoc == null) {
-            System.out.printf("Cannot get XTextDocument interface for Text Document???\n");
+            mylog.error("Cannot get XTextDocument interface for Text Document???\n");
             System.exit(7);
         }
 
@@ -162,7 +163,7 @@ public class DecompText {
             XNamed xGOName = (XNamed) UnoRuntime.queryInterface(XNamed.class, oGraphic);
             xGOName.setName(originalImageName);
         } catch (Exception exception) {
-            System.out.println("Could not create TextGraphicObject instance");
+            mylog.error("Could not create TextGraphicObject instance");
             return 1;
         }
 
@@ -212,7 +213,7 @@ public class DecompText {
             origProps.setPropertyValue("Graphic", xGraphic);
 
         } catch (Exception exception) {
-            System.out.println("Couldn't set image properties");
+            mylog.error("Couldn't set image properties");
             return 1;
         }
 
@@ -230,7 +231,7 @@ public class DecompText {
             XTextRange xTextRange1 = xModelCursor.getStart();
             xText1.insertTextContent(xTextRange1, xTextContent, true);
         } catch (Exception exception) {
-            System.out.println("Could not insert Content");
+            mylog.error("Could not insert Content");
             exception.printStackTrace(System.err);
             return 1;
         }
@@ -247,7 +248,7 @@ public class DecompText {
                                            XParagraphCursor xCursor)
     {
         try {
-            String convertedURL = DecompUtil.getInternalURL(xCompDoc, citationURL, "image");
+            String convertedURL = DecompUtil.getInternalURL(xCompDoc, citationURL, citationURL);
 
             // From http://www.oooforum.org/forum/viewtopic.phtml?t=74008
             XMultiServiceFactory xMSF = (XMultiServiceFactory) UnoRuntime.queryInterface(XMultiServiceFactory.class, xCompDoc);
@@ -277,6 +278,7 @@ public class DecompText {
     public static int insertImageCitation(XComponentContext xContext,
                                           XMultiComponentFactory xMCF,
                                           XComponent xCompDoc,
+                                          String citationText,
                                           String citationURL,
                                           int p,
                                           int s)
@@ -284,7 +286,7 @@ public class DecompText {
         try {
             XTextDocument xTextDoc = (XTextDocument) UnoRuntime.queryInterface(XTextDocument.class, xCompDoc);
             if (xTextDoc == null) {
-                System.out.printf("Cannot get XTextDocument interface for Text Document???\n");
+                mylog.error("Cannot get XTextDocument interface for Text Document???\n");
                 System.exit(7);
             }
             XTextContent xImage = (XTextContent) getImageObject(xTextDoc, s);
@@ -305,10 +307,11 @@ public class DecompText {
 
             xText.insertControlCharacter(xParaCursor, ControlCharacter.PARAGRAPH_BREAK, false);
             insertLicenseButton(xContext, xMCF, xCompDoc, citationURL, xText, xParaCursor);
-            xText.insertString(xParaCursor, "http://open.umich.edu ", false);
-            xText.insertString(xParaCursor, "This is a long string to see what will happen with a large amount of text if the text is ", false);
-            xText.insertString(xParaCursor, "too long to fit within the rectangle.  We'll add even more text to see what happens ", false);
-            xText.insertString(xParaCursor, "when the smaller text exceeds the defined rectangle that is supposed to contain the text.", false);
+            xText.insertString(xParaCursor, citationText, false);
+//            xText.insertString(xParaCursor, "http://open.umich.edu ", false);
+//            xText.insertString(xParaCursor, "This is a long string to see what will happen with a large amount of text if the text is ", false);
+//            xText.insertString(xParaCursor, "too long to fit within the rectangle.  We'll add even more text to see what happens ", false);
+//            xText.insertString(xParaCursor, "when the smaller text exceeds the defined rectangle that is supposed to contain the text.", false);
             xText.insertControlCharacter(xParaCursor, ControlCharacter.PARAGRAPH_BREAK, false);
 
         } catch (IllegalArgumentException ex) {
@@ -330,7 +333,7 @@ public class DecompText {
 
         XTextDocument xTextDoc = (XTextDocument) UnoRuntime.queryInterface(XTextDocument.class, xCompDoc);
         if (xTextDoc == null) {
-            System.out.printf("Cannot get XTextDocument interface for Text Document???\n");
+            mylog.error("Cannot get XTextDocument interface for Text Document???\n");
             System.exit(7);
         }
         XTextContent xImage = (XTextContent) getImageObject(xTextDoc, s);
@@ -354,7 +357,7 @@ public class DecompText {
         try {
             XTextDocument xTextDoc = (XTextDocument) UnoRuntime.queryInterface(XTextDocument.class, xCompDoc);
             if (xTextDoc == null) {
-                System.out.printf("Cannot get XTextDocument interface for Text Document???\n");
+                mylog.error("Cannot get XTextDocument interface for Text Document???\n");
                 System.exit(7);
             }
             Any xImageAny = null;
@@ -419,7 +422,7 @@ public class DecompText {
         try {
             XTextDocument xTextDoc = (XTextDocument) UnoRuntime.queryInterface(XTextDocument.class, xCompDoc);
             if (xTextDoc == null) {
-                System.out.printf("Cannot get XTextDocument interface for Text Document???\n");
+                mylog.error("Cannot get XTextDocument interface for Text Document???\n");
                 System.exit(7);
             }
 /*  This is replaced by getImageObjectByName
@@ -652,9 +655,7 @@ public class DecompText {
             XTextGraphicObjectsSupplier xTextGOS = (XTextGraphicObjectsSupplier) UnoRuntime.queryInterface(XTextGraphicObjectsSupplier.class, xCompDoc);
             XNameAccess xEONames = xTextGOS.getGraphicObjects();
             XIndexAccess xEOIndexes = (XIndexAccess) UnoRuntime.queryInterface(XIndexAccess.class, xEONames);
-            if (DecompUtil.beingVerbose()) {
-                System.out.printf("There are %d GraphicsObjects in this document\n", xEOIndexes.getCount());
-            }
+            mylog.debug("There are %d GraphicsObjects in this document\n", xEOIndexes.getCount());
             XShape graphicShape = (XShape) UnoRuntime.queryInterface(XShape.class, xEOIndexes.getByIndex(x));
             return graphicShape;
         } catch (Exception ex) {
@@ -692,10 +693,10 @@ public class DecompText {
 //          xStorable.storeAsURL(newFNameURL, propertyValue);
             xStorable.storeToURL(newFNameURL, propertyValue);
         } catch (com.sun.star.io.IOException ex) {
-            System.out.println(ex.getMessage());
+            mylog.error("Caught I/O Exception: " + ex.getMessage());
             //ex.printStackTrace();
         } catch (Exception e) {
-            System.out.println("Caught Exception storing image: " + e.getMessage());
+            mylog.error("Caught Exception storing image: " + e.getMessage());
             //e.printStackTrace();
         }
     }
@@ -718,7 +719,7 @@ public class DecompText {
             XDrawPageSupplier xDrawPageSuppl =
                     (XDrawPageSupplier) UnoRuntime.queryInterface(XDrawPageSupplier.class, xCompDoc);
             if (xDrawPageSuppl == null) {
-                System.out.println("Failed to get xDrawPageSuppl from xComp");
+                mylog.error("Failed to get xDrawPageSuppl from xComp");
                 return null;
             }
 
