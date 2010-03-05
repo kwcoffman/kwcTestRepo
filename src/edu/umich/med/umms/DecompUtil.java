@@ -63,6 +63,7 @@ import com.sun.star.ucb.XSimpleFileAccess2;
 import com.sun.star.uno.Exception;
 import com.sun.star.uno.UnoRuntime;
 import com.sun.star.uno.XComponentContext;
+import java.io.File;
 import java.util.UUID;
 
 
@@ -72,33 +73,22 @@ import java.util.UUID;
  */
 public class DecompUtil {
 
-    private static boolean verbose = false;
-    private static boolean excludeCustomShapes = false;
-    private static final com.spinn3r.log5j.Logger mylog = com.spinn3r.log5j.Logger.getLogger();
+    private com.spinn3r.log5j.Logger mylog = com.spinn3r.log5j.Logger.getLogger();
+    private org.apache.log4j.Level myLogLevel = org.apache.log4j.Level.WARN;
 
-    public static boolean beingVerbose()
+    public DecompUtil()
     {
-        return verbose;
+        mylog = com.spinn3r.log5j.Logger.getLogger();
     }
 
-    public static void setVerbosity(boolean value)
+    public DecompUtil(DecompParameters dp)
     {
-        verbose = value;
     }
 
-    public static boolean excludingCustomShapes()
+    public void setLoggingLevel(org.apache.log4j.Level lvl)
     {
-        return excludeCustomShapes;
-    }
-
-    public static void excludeCustomShapes()
-    {
-        excludeCustomShapes = true;
-    }
-
-    public static void initializeLogging()
-    {
-
+        myLogLevel = lvl;
+        mylog.setLevel(myLogLevel);
     }
 
     public static XComponent openFileForProcessing(XDesktop xDesktop, String inputFileUrl) throws java.lang.Exception
@@ -174,39 +164,39 @@ public class DecompUtil {
         return xShape;
     }
 
-    public static void printShapeProperties(XShape shape) throws WrappedTargetException
+    public /*static*/ void printShapeProperties(XShape shape) throws WrappedTargetException
     {
 
         // Get and print all the shape's properties
         XPropertySet xShapeProperties = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, shape);
         Property[] props = xShapeProperties.getPropertySetInfo().getProperties();
-        mylog.info("----- Printing Shape Properties -----");
+        mylog.debug("----- Printing Shape Properties -----");
         for (int x = 0; x < props.length; x++) {
             try {
-                mylog.info("    Property " + props[x].Name + " = " + xShapeProperties.getPropertyValue(props[x].Name));
+                mylog.debug("    Property " + props[x].Name + " = " + xShapeProperties.getPropertyValue(props[x].Name));
             } catch (UnknownPropertyException ex) {
                 Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
-        mylog.info("");
+        mylog.debug("");
 
     }
 
-    public static void printObjectProperties(Object obj) throws WrappedTargetException
+    public /*static*/ void printObjectProperties(Object obj) throws WrappedTargetException
     {
 
         // Get and print all the shape's properties
         XPropertySet xShapeProperties = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, obj);
         Property[] props = xShapeProperties.getPropertySetInfo().getProperties();
-        mylog.info("----- Printing Object Properties -----");
+        mylog.debug("----- Printing Object Properties -----");
         for (int x = 0; x < props.length; x++) {
             try {
-                mylog.info("    Property " + props[x].Name + " = " + xShapeProperties.getPropertyValue(props[x].Name));
+                mylog.debug("    Property " + props[x].Name + " = " + xShapeProperties.getPropertyValue(props[x].Name));
             } catch (UnknownPropertyException ex) {
                 Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
-        mylog.info("");
+        mylog.debug("");
 
     }
 
@@ -258,7 +248,7 @@ public class DecompUtil {
         return citeTextSize;
     }
 
-    public static void printSupportedServices(XComponent xCompDoc)
+    public /*static*/ void printSupportedServices(XComponent xCompDoc)
     {
                 XServiceInfo xServiceInfo = (XServiceInfo) UnoRuntime.queryInterface(
                     XServiceInfo.class, xCompDoc);
@@ -267,12 +257,12 @@ public class DecompUtil {
                 if (svcNames.length > 0)
                     mylog.debug("This document supports the following services:");
                 for (int i = 0; i < svcNames.length; i++) {
-                    mylog.debug("\t%s\n", svcNames[i]);
+                    mylog.debug("\t%s", svcNames[i]);
                 }
             }
     }
 
-    public static void exportContextImage(XComponentContext xContext,
+    public /*static*/ void exportContextImage(XComponentContext xContext,
                                            XMultiComponentFactory xMCF,
                                            XDrawPage page,
                                            String outputDir,
@@ -286,9 +276,9 @@ public class DecompUtil {
                 Object shapeURLObj = shapeProps.getPropertyValue("GraphicURL");
                 String shapeURL = shapeURLObj.toString();
 
-            //mylog.debug("The URL for this shape is '%s'\n", shapeURL);
+            //mylog.debug("The URL for this shape is '%s'", shapeURL);
             } catch (Exception e) {
-                mylog.error("Unable to get GraphicURL property for context image: '%s'\n", e.getMessage());
+                mylog.error("Unable to get GraphicURL property for context image: '%s'", e.getMessage());
             }
         }
  */
@@ -303,7 +293,7 @@ public class DecompUtil {
         outProps[1].Name = "URL";
         outProps[1].Value = "file://" + fname;
 
-        mylog.debug("Exporting page %d to file '%s'\n", p, fname);
+        mylog.debug("Exporting page %d to file '%s'", p, fname);
 
         try {
 
@@ -322,7 +312,7 @@ public class DecompUtil {
     }
 
 
-    public static void exportImage(XComponentContext xContext,
+    public /*static*/ void exportImage(XComponentContext xContext,
                                     XMultiComponentFactory xMCF,
                                     XShape shape,
                                     String outputDir,
@@ -335,9 +325,9 @@ public class DecompUtil {
 //            Object shapeURLObj = shapeProps.getPropertyValue("GraphicURL");
 //            String shapeURL = shapeURLObj.toString();
 //
-//            //mylog.debug("The URL for this shape is '%s'\n", shapeURL);
+//            //mylog.debug("The URL for this shape is '%s'", shapeURL);
 //        } catch (Exception e) {
-//            mylog.debug("Unable to get GraphicURL property for object: '%s'\n", e.getMessage());
+//            mylog.debug("Unable to get GraphicURL property for object: '%s'", e.getMessage());
 //        }
 
         String fname = String.format("%s/%s-%05d-%03d.%s", outputDir, "image", p, s, "png");
@@ -354,7 +344,7 @@ public class DecompUtil {
         outProps[1].Name = "URL";
         outProps[1].Value = fileNameToOOoURL(fname);
 
-        mylog.debug("Exporting shape %d from page %d to file '%s'\n", s, p, fname);
+        mylog.debug("Exporting shape %d from page %d to file '%s'", s, p, fname);
 
         try {
 
@@ -373,7 +363,7 @@ public class DecompUtil {
         }
     }
 
-    public static void extractImageByURL(XComponentContext xContext,
+    public /*static*/ void extractImageByURL(XComponentContext xContext,
                                          XMultiComponentFactory xMCF,
                                          XComponent xCompDoc,
                                          String pictureURL,
@@ -396,11 +386,11 @@ public class DecompUtil {
 
             String[] allNames = xDocStorageNameAccess.getElementNames();
 //            for (int i = 0; i < allNames.length; i++) {
-//                mylog.debug("The big list has name '%s'\n", allNames[i]);
+//                mylog.debug("The big list has name '%s'", allNames[i]);
 //            }
 
             if (!xDocStorageNameAccess.hasByName("Pictures")) {
-                mylog.debug("Found no \"Pictures\" in the document!!!\n");
+                mylog.debug("Found no \"Pictures\" in the document!!!");
                 return;
             }
 
@@ -409,10 +399,10 @@ public class DecompUtil {
                     UnoRuntime.queryInterface(XNameAccess.class, oPicturesStorage);
 
             String[] aNames = xPicturesNameAccess.getElementNames();
-            mylog.debug("There were a total of %d pictures found via DocStorageAccess\n", aNames.length);
+            mylog.debug("There were a total of %d pictures found via DocStorageAccess", aNames.length);
             for (int i = 0; i < aNames.length; i++) {
-                //mylog.debug("Picture %d has name '%s'\n", i+1, aNames[i]);
-                //mylog.debug("Processing picture with name '%s'\n", aNames[i]);
+                //mylog.debug("Picture %d has name '%s'", i+1, aNames[i]);
+                //mylog.debug("Processing picture with name '%s'", aNames[i]);
                 if (aNames[i].contains(pictureURL)) {
                     Object oElement = xPicturesNameAccess.getByName(aNames[i]);
                     XStream xStream = (XStream) UnoRuntime.queryInterface(XStream.class, oElement);
@@ -420,7 +410,7 @@ public class DecompUtil {
                     XInputStream xInputStream = (XInputStream)
                             UnoRuntime.queryInterface(XInputStream.class, oInput);
 
-                    xFileWriter.writeFile(outName + "." + DecompUtil.getExtension(aNames[i]), xInputStream);
+                    xFileWriter.writeFile(outName + "." + getExtension(aNames[i]), xInputStream);
                     break;
                 }
 
@@ -432,7 +422,7 @@ public class DecompUtil {
 
     }
 
-    public static void printDocumentType(XComponentContext xContext,
+    public /*static*/ void printDocumentType(XComponentContext xContext,
                                           XMultiComponentFactory xMCF,
                                           String sURL)
     {
@@ -469,7 +459,7 @@ public class DecompUtil {
 
     }
 
-    public static String getDocumentType(XComponentContext xContext,
+    public /*static*/ String getDocumentType(XComponentContext xContext,
                                           XMultiComponentFactory xMCF,
                                           String sURL)
     {
@@ -511,14 +501,14 @@ public class DecompUtil {
         return sLoadUrl.toString();
     }
 
-    public static void storeDocument(XComponentContext xContext,
+    public /*static*/ void storeDocument(XComponentContext xContext,
                                       XMultiComponentFactory xMCF,
                                       XComponent xCompDoc,
                                       String newFNameUrl,
                                       String filterName)
     {
         //String newFNameURL = fileNameToOOoURL(newFName);
-        mylog.debug("Storing file using URL '%s'\n", newFNameUrl);
+        mylog.debug("Storing file using URL '%s'", newFNameUrl);
 
         XStorable xStorable = (XStorable) UnoRuntime.queryInterface(XStorable.class, xCompDoc);
         PropertyValue[] propertyValue = new PropertyValue[3];
@@ -562,7 +552,7 @@ public class DecompUtil {
         return nativeFormat;
     }
 
-    public static String possiblyUseTemporaryDocument(XComponentContext xContext,
+    public /*static*/ String possiblyUseTemporaryDocument(XComponentContext xContext,
                                                XMultiComponentFactory xMCF,
                                                XComponent xCompOrigDoc,
                                                String origName,
@@ -588,6 +578,15 @@ public class DecompUtil {
         // Get current file type and determine if we need to save it in OO format
 
         return newName;
+    }
+
+    public static boolean removeTemporaryDocument(String name)
+    {
+        File f = new File(name);
+        if (!f.exists())
+            return false;
+
+        return f.delete();
     }
 
     public static String getExtension(String fullName)

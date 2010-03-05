@@ -68,18 +68,35 @@ import com.sun.star.uno.XComponentContext;
  * @author kwc@umich.edu
  */
 public class DecompText {
-    private static final com.spinn3r.log5j.Logger mylog = com.spinn3r.log5j.Logger.getLogger();
+
+    private com.spinn3r.log5j.Logger mylog = com.spinn3r.log5j.Logger.getLogger();
+    private org.apache.log4j.Level myLogLevel = org.apache.log4j.Level.WARN;
+
+    public DecompText()
+    {
+        mylog = com.spinn3r.log5j.Logger.getLogger();
+    }
+
+    public void setLoggingLevel(org.apache.log4j.Level lvl)
+    {
+        myLogLevel = lvl;
+        mylog.setLevel(myLogLevel);
+    }
 
     /* Extract Images using indexes rather than names */
-    public static void extractImages(XComponentContext xContext,
+    public void extractImages(XComponentContext xContext,
                                      XMultiComponentFactory xMCF,
                                      XComponent xCompDoc,
-                                     String outputDir)
+                                     String outputDir,
+                                     boolean excludeCustomShapes)
     {
+        DecompUtil du = new DecompUtil();
+        du.setLoggingLevel(myLogLevel);
+
         XTextDocument xTextDoc =
                     (XTextDocument) UnoRuntime.queryInterface(XTextDocument.class, xCompDoc);
         if (xTextDoc == null) {
-            mylog.error("Cannot get XTextDocument interface for Text Document???\n");
+            mylog.error("Cannot get XTextDocument interface for Text Document???");
             System.exit(7);
         }
 
@@ -105,14 +122,14 @@ public class DecompText {
                 String pictureURL = textProps.getPropertyValue("GraphicURL").toString();
                 pictureURL = pictureURL.substring(27);  // Chop off the leading "vnd.sun.star.GraphicObject:"
                 String outName = DecompUtil.constructBaseImageName(outputDir, 1, i);
-                DecompUtil.extractImageByURL(xContext, xMCF, xCompDoc, pictureURL, outName);
+                du.extractImageByURL(xContext, xMCF, xCompDoc, pictureURL, outName);
             }
         } catch (Exception ex) {
             Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 
-    private static Object getImageObject(XTextDocument xTextDoc, int s)
+    private Object getImageObject(XTextDocument xTextDoc, int s)
     {
         // Get reference to image object in the text document
         Any xImageAny = null;
@@ -136,7 +153,7 @@ public class DecompText {
 
     // XXX Revise this to use index value rather than a name !?!?!?!?!? XXX
     /* From http://www.oooforum.org/forum/viewtopic.phtml?t=81870 */
-    public static int replaceImage(XComponentContext xContext,
+    public int replaceImage(XComponentContext xContext,
                                            XMultiComponentFactory xMCF,
                                            XComponent xCompDoc,
                                            String originalImageName,
@@ -146,7 +163,7 @@ public class DecompText {
         XTextDocument xTextDoc =
                     (XTextDocument) UnoRuntime.queryInterface(XTextDocument.class, xCompDoc);
         if (xTextDoc == null) {
-            mylog.error("Cannot get XTextDocument interface for Text Document???\n");
+            mylog.error("Cannot get XTextDocument interface for Text Document???");
             System.exit(7);
         }
 
@@ -240,7 +257,7 @@ public class DecompText {
     }
 
     // This places the button according to the Point and Size as specified.  I want it "inline" with the text
-    private static int insertLicenseButton(XComponentContext xContext,
+    private int insertLicenseButton(XComponentContext xContext,
                                            XMultiComponentFactory xMCF,
                                            XComponent xCompDoc,
                                            String citationURL,
@@ -275,18 +292,18 @@ public class DecompText {
         return 1;
     }
 
-    public static int insertImageCitation(XComponentContext xContext,
-                                          XMultiComponentFactory xMCF,
-                                          XComponent xCompDoc,
-                                          String citationText,
-                                          String citationURL,
-                                          int p,
-                                          int s)
+    public int insertImageCitation(XComponentContext xContext,
+                                   XMultiComponentFactory xMCF,
+                                   XComponent xCompDoc,
+                                   String citationText,
+                                   String citationURL,
+                                   int p,
+                                   int s)
     {
         try {
             XTextDocument xTextDoc = (XTextDocument) UnoRuntime.queryInterface(XTextDocument.class, xCompDoc);
             if (xTextDoc == null) {
-                mylog.error("Cannot get XTextDocument interface for Text Document???\n");
+                mylog.error("Cannot get XTextDocument interface for Text Document???");
                 System.exit(7);
             }
             XTextContent xImage = (XTextContent) getImageObject(xTextDoc, s);
@@ -321,19 +338,19 @@ public class DecompText {
         return 0;
     }
 
-    public static int insertImageCitationsAsReferences(XComponentContext xContext,
-                                                       XMultiComponentFactory xMCF,
-                                                       XComponent xCompDoc,
-                                                       String citationString,
-                                                       String citationURL,
-                                                       int p,
-                                                       int s)
+    public int insertImageCitationsAsReferences(XComponentContext xContext,
+                                                XMultiComponentFactory xMCF,
+                                                XComponent xCompDoc,
+                                                String citationString,
+                                                String citationURL,
+                                                int p,
+                                                int s)
     {
         // XXX Somehow... need to find button image file name and citation text for each image...
 
         XTextDocument xTextDoc = (XTextDocument) UnoRuntime.queryInterface(XTextDocument.class, xCompDoc);
         if (xTextDoc == null) {
-            mylog.error("Cannot get XTextDocument interface for Text Document???\n");
+            mylog.error("Cannot get XTextDocument interface for Text Document???");
             System.exit(7);
         }
         XTextContent xImage = (XTextContent) getImageObject(xTextDoc, s);
@@ -347,17 +364,17 @@ public class DecompText {
         return 0;
     }
 
-    public static int insertImageCitationKindaWorks(XComponentContext xContext,
-                                          XMultiComponentFactory xMCF,
-                                          XComponent xCompDoc,
-                                          String citationURL,
-                                          int p,
-                                          int s)
+    public int insertImageCitationKindaWorks(XComponentContext xContext,
+                                             XMultiComponentFactory xMCF,
+                                             XComponent xCompDoc,
+                                             String citationURL,
+                                             int p,
+                                             int s)
     {
         try {
             XTextDocument xTextDoc = (XTextDocument) UnoRuntime.queryInterface(XTextDocument.class, xCompDoc);
             if (xTextDoc == null) {
-                mylog.error("Cannot get XTextDocument interface for Text Document???\n");
+                mylog.error("Cannot get XTextDocument interface for Text Document???");
                 System.exit(7);
             }
             Any xImageAny = null;
@@ -409,9 +426,9 @@ public class DecompText {
         return 0;
     }
 
-
-    /* XXX To be completed! To be changed to use index rather than name??? */
-    public static int insertImageCitation_Take_1(XComponentContext xContext,
+/*
+    // XXX To be completed! To be changed to use index rather than name???
+    public int insertImageCitation_Take_1(XComponentContext xContext,
                                           XMultiComponentFactory xMCF,
                                           XComponent xCompDoc,
                                           String originalImageName,
@@ -422,25 +439,24 @@ public class DecompText {
         try {
             XTextDocument xTextDoc = (XTextDocument) UnoRuntime.queryInterface(XTextDocument.class, xCompDoc);
             if (xTextDoc == null) {
-                mylog.error("Cannot get XTextDocument interface for Text Document???\n");
+                mylog.error("Cannot get XTextDocument interface for Text Document???");
                 System.exit(7);
             }
-/*  This is replaced by getImageObjectByName
-            Any aImage = null;
-            Object oImage = null;
-            try {
-                XTextGraphicObjectsSupplier xTGOS = (XTextGraphicObjectsSupplier) UnoRuntime.queryInterface(XTextGraphicObjectsSupplier.class, xTextDoc);
-                XNameAccess xNAGraphicObjects = xTGOS.getGraphicObjects();
-                aImage = (Any) xNAGraphicObjects.getByName(originalImageName);
-            } catch (NoSuchElementException ex) {
-                Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
-            } catch (WrappedTargetException ex) {
-                Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
-            }
-            if (aImage == null) {
-                return 1;
-            }
-*/
+//  This is replaced by getImageObjectByName
+//            Any aImage = null;
+//            Object oImage = null;
+//            try {
+//                XTextGraphicObjectsSupplier xTGOS = (XTextGraphicObjectsSupplier) UnoRuntime.queryInterface(XTextGraphicObjectsSupplier.class, xTextDoc);
+//                XNameAccess xNAGraphicObjects = xTGOS.getGraphicObjects();
+//                aImage = (Any) xNAGraphicObjects.getByName(originalImageName);
+//            } catch (NoSuchElementException ex) {
+//                Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
+//            } catch (WrappedTargetException ex) {
+//                Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
+//            }
+//            if (aImage == null) {
+//                return 1;
+//            }
 
             XDrawPage xDrawPage = getDrawPage(xCompDoc);
             if (xDrawPage == null)
@@ -450,20 +466,20 @@ public class DecompText {
             if (xShapes == null)
                 return 1;
 
-/*
-            Object oImage = getImageObjectByIndex(xTextDoc, s);
-//            Object oImage = getImageObjectByName(xTextDoc, originalImageName);
-            if (oImage == null)
-                return 1;
-            XTextContent xImage = (XTextContent) oImage;
 
-            // Use the original image location and size to determine the location
-            // and size (at least the width?) of the citation information
-            XPropertySet xOrigPropSet = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, oImage);
-            //            DecompUtil.printObjectProperties(oOrigImage);
-            XShape xOrigImage = (XShape) UnoRuntime.queryInterface(XShape.class, oImage);
-            //            DecompUtil.printShapeProperties(xOrigImage);
-*/
+//            Object oImage = getImageObjectByIndex(xTextDoc, s);
+////            Object oImage = getImageObjectByName(xTextDoc, originalImageName);
+//            if (oImage == null)
+//                return 1;
+//            XTextContent xImage = (XTextContent) oImage;
+//
+//            // Use the original image location and size to determine the location
+//            // and size (at least the width?) of the citation information
+//            XPropertySet xOrigPropSet = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, oImage);
+//            //            DecompUtil.printObjectProperties(oOrigImage);
+//            XShape xOrigImage = (XShape) UnoRuntime.queryInterface(XShape.class, oImage);
+//            //            DecompUtil.printShapeProperties(xOrigImage);
+
             XShape xOrigImage = getXShapeByIndex(xContext, xMCF, xCompDoc, 1);
             DecompUtil.printShapeProperties(xOrigImage);
 
@@ -471,35 +487,35 @@ public class DecompText {
             XTextRange imageRange = imageContent.getAnchor();
 //            XTextCursor docCursor = ((XTextViewCursorSupplier)UnoRuntime.queryInterface(XTextViewCursorSupplier.class, xTextDoc.getCurrentController())).getViewCursor();
 
-/*
-            Point citeImagePos = DecompUtil.calculateCitationImagePosition(xOrigImage);
-            Size citeImageSize = DecompUtil.calculateCitationImageSize(xOrigImage);
-            String convertedURL = DecompUtil.getInternalURL(xCompDoc, citationURL, "image");
 
-            XShape xCIShape = DecompUtil.createShape(xCompDoc, citeImagePos, citeImageSize,
-                                    "com.sun.star.drawing.GraphicObjectShape");
-            XPropertySet xImageProps = (XPropertySet)
-                    UnoRuntime.queryInterface(XPropertySet.class, xCIShape);
-            xImageProps.setPropertyValue("GraphicURL", convertedURL);
-            xShapes.add(xCIShape);
+//            Point citeImagePos = DecompUtil.calculateCitationImagePosition(xOrigImage);
+//            Size citeImageSize = DecompUtil.calculateCitationImageSize(xOrigImage);
+//            String convertedURL = DecompUtil.getInternalURL(xCompDoc, citationURL, "image");
 
-            // Caclulate citation text location using citation image location
-            Point citeTextPos = DecompUtil.calculateCitationTextPosition(xCIShape);
-            Size citeTextSize = DecompUtil.calculateCitationTextSize(xOrigImage, xCIShape);
+//            XShape xCIShape = DecompUtil.createShape(xCompDoc, citeImagePos, citeImageSize,
+//                                    "com.sun.star.drawing.GraphicObjectShape");
+//            XPropertySet xImageProps = (XPropertySet)
+//                    UnoRuntime.queryInterface(XPropertySet.class, xCIShape);
+//            xImageProps.setPropertyValue("GraphicURL", convertedURL);
+//            xShapes.add(xCIShape);
 
-            // Add citation text
-            XShape xCTShape = DecompUtil.createShape(xCompDoc, citeTextPos, citeTextSize,
-                                    "com.sun.star.drawing.TextShape");  // There is also a TextShape?
-            xShapes.add(xCTShape);
+//            // Caclulate citation text location using citation image location
+//            Point citeTextPos = DecompUtil.calculateCitationTextPosition(xCIShape);
+//            Size citeTextSize = DecompUtil.calculateCitationTextSize(xOrigImage, xCIShape);
 
-            XText xText = UnoRuntime.queryInterface(XText.class, xCTShape);
-            XTextCursor xTextCursor = xText.createTextCursor();
-            XPropertySet xTxtProps = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, xTextCursor);
+//            // Add citation text
+//            XShape xCTShape = DecompUtil.createShape(xCompDoc, citeTextPos, citeTextSize,
+//                                    "com.sun.star.drawing.TextShape");  // There is also a TextShape?
+//            xShapes.add(xCTShape);
+//
+//            XText xText = UnoRuntime.queryInterface(XText.class, xCTShape);
+//            XTextCursor xTextCursor = xText.createTextCursor();
+//            XPropertySet xTxtProps = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, xTextCursor);
+//
+//            xTxtProps.setPropertyValue("CharHeight", 8);
+//            xTxtProps.setPropertyValue("CharColor", new Integer(0xffffff));
+//            xText.setString("http://open.umich.edu This is a long string to see what will happen with a large amount of text if the text is too long to fit within the rectangle.  We'll add even more text to see what happens when the smaller text exceeds the defined rectangle that is supposed to contain the text.");
 
-            xTxtProps.setPropertyValue("CharHeight", 8);
-            xTxtProps.setPropertyValue("CharColor", new Integer(0xffffff));
-            xText.setString("http://open.umich.edu This is a long string to see what will happen with a large amount of text if the text is too long to fit within the rectangle.  We'll add even more text to see what happens when the smaller text exceeds the defined rectangle that is supposed to contain the text.");
-*/
             //docCursor.gotoStart(false);
             //docCursor.gotoRange(xOrigImage., false);
             // Get View Cursor
@@ -524,7 +540,7 @@ public class DecompText {
             return 1;
         }
     }
-
+*/
 
 
     /* Original code is from:
@@ -532,7 +548,7 @@ public class DecompText {
      * Seems pretty complicated!!
      */
 /*
-    private static String convertLinkedImageToEmbeddedImage(XComponentContext xContext,
+    private String convertLinkedImageToEmbeddedImage(XComponentContext xContext,
                                           XMultiComponentFactory xMCF,
                                           XComponent xCompDoc,
                                           String origImageURL) {
@@ -605,7 +621,7 @@ public class DecompText {
     }
 */
 
-    private static Object getImageObjectByName(XComponent xTextDoc, String name)
+    private Object getImageObjectByName(XComponent xTextDoc, String name)
     {
         Any xImageAny = null;
         Object xImageObject = null;
@@ -625,7 +641,7 @@ public class DecompText {
     }
 
 /*
-    private static Object getImageObjectByIndex(XComponent xTextDoc, int x)
+    private Object getImageObjectByIndex(XComponent xTextDoc, int x)
     {
         Any xImageAny = null;
         Object xImageObject = null;
@@ -644,10 +660,10 @@ public class DecompText {
         return xImageAny.getObject();
     }
 */
-    private static XShape getXShapeByIndex(XComponentContext xContext,
-                                           XMultiComponentFactory xMCF,
-                                           XComponent xCompDoc,
-                                           int x)
+    private XShape getXShapeByIndex(XComponentContext xContext,
+                                    XMultiComponentFactory xMCF,
+                                    XComponent xCompDoc,
+                                    int x)
     {
         try {
             Object oGraphicProvider = xMCF.createInstanceWithContext("com.sun.star.graphic.GraphicProvider", xContext);
@@ -664,13 +680,13 @@ public class DecompText {
         return null;
     }
 
-    private static void storeImage(XComponentContext xContext,
-                                   XMultiComponentFactory xMCF,
-                                   XComponent xCompDoc,
-                                   XShape xShape,
-                                   String outputDir,
-                                   int p,
-                                   int s) {
+    private void storeImage(XComponentContext xContext,
+                            XMultiComponentFactory xMCF,
+                            XComponent xCompDoc,
+                            XShape xShape,
+                            String outputDir,
+                            int p,
+                            int s) {
         String newFName = String.format("%s/%s-%05d-%03d.%s", outputDir, "image", p, s, "jpg");
         String newFNameURL = DecompUtil.fileNameToOOoURL(newFName);
 
@@ -701,7 +717,7 @@ public class DecompText {
         }
     }
 
-    private static XDrawPage getDrawPage(XDrawPage xDrawPage, int nIndex)
+    private XDrawPage getDrawPage(XDrawPage xDrawPage, int nIndex)
     {
         XDrawPage xDP = null;
         try {
@@ -714,7 +730,7 @@ public class DecompText {
         }
     }
 
-    private static XDrawPage getDrawPage(XComponent xCompDoc)
+    private XDrawPage getDrawPage(XComponent xCompDoc)
     {
             XDrawPageSupplier xDrawPageSuppl =
                     (XDrawPageSupplier) UnoRuntime.queryInterface(XDrawPageSupplier.class, xCompDoc);
@@ -728,7 +744,7 @@ public class DecompText {
 
     }
 
-    private static XShapes getXShapes(XDrawPage xDrawPage)
+    private XShapes getXShapes(XDrawPage xDrawPage)
     {
         XShapes xShapes = (XShapes) UnoRuntime.queryInterface(XShapes.class, xDrawPage);
         return xShapes;

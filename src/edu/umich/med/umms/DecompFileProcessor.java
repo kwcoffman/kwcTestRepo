@@ -4,6 +4,7 @@ import com.sun.star.frame.XDesktop;
 import com.sun.star.lang.XComponent;
 import com.sun.star.lang.XMultiComponentFactory;
 import com.sun.star.uno.XComponentContext;
+import java.util.Iterator;
 
 /**
  *
@@ -11,7 +12,8 @@ import com.sun.star.uno.XComponentContext;
  */
 public class DecompFileProcessor {
 
-    private static final com.spinn3r.log5j.Logger mylog = com.spinn3r.log5j.Logger.getLogger();
+    private com.spinn3r.log5j.Logger mylog = com.spinn3r.log5j.Logger.getLogger();
+    private org.apache.log4j.Level myLogLevel = org.apache.log4j.Level.WARN;
 
     private XComponentContext xContext = null;
     private XDesktop xDesktop = null;
@@ -23,9 +25,13 @@ public class DecompFileProcessor {
     private String outputDir = "";
     private String fileType = "";
 
-    private static OOoFormat origFileFormat = null;
-    private static OOoFormat ooFileFormat = null;
-    private static OOoFormat processFileFormat = null;
+    private OOoFormat origFileFormat = null;
+    private OOoFormat ooFileFormat = null;
+    private OOoFormat processFileFormat = null;
+
+    private DecompUtil myutil;
+
+    private DecompCitationCollection citations;
 
     public void setXComponentContext(XComponentContext xCtx)
     {
@@ -52,10 +58,18 @@ public class DecompFileProcessor {
         outputDir = newOutputDir;
     }
 
+    public DecompFileProcessor()
+    {
+        myutil = new DecompUtil();
+        citations = new DecompCitationCollection();
+    }
 
-    public DecompFileProcessor(XComponentContext xCtx, XDesktop xDt, String infile) throws java.lang.Exception {
+    public DecompFileProcessor(XComponentContext xCtx, XDesktop xDt, String infile) throws java.lang.Exception
+    {
         xContext = xCtx;
         xDesktop = xDt;
+        myutil = new DecompUtil();
+
         inputFileUrl = DecompUtil.fileNameToOOoURL(infile);
 
         xCompDoc = DecompUtil.openFileForProcessing(xDesktop, inputFileUrl);
@@ -64,22 +78,30 @@ public class DecompFileProcessor {
         xMCF = xContext.getServiceManager();
 
         // Verify it is a supported document type
-        fileType = DecompUtil.getDocumentType(xContext, xMCF, inputFileUrl);
+        fileType = myutil.getDocumentType(xContext, xMCF, inputFileUrl);
         origFileFormat = OOoFormat.findFormatWithDocumentType(fileType);
         if (!DecompUtil.isaSupportedFormat(origFileFormat)) {
             xCompDoc.dispose();
             java.lang.Exception e = new java.lang.Exception("File " + inputFileUrl + ": format " + fileType + ": unsupported file format");
             throw e;
         }
-
+        citations = new DecompCitationCollection();
     }
+
+    public void setLoggingLevel(org.apache.log4j.Level lvl)
+    {
+        myLogLevel = lvl;
+        mylog.setLevel(myLogLevel);
+    }
+
 
     public void printSupportedServices()
     {
-        if (xCompDoc != null && DecompUtil.beingVerbose()) DecompUtil.printSupportedServices(xCompDoc);
+        if (xCompDoc != null)
+            myutil.printSupportedServices(xCompDoc);
     }
 
-    public int replaceImage(String repImageFile, int pgnum, int imgnum) throws java.lang.Exception
+    private int replaceImage(String repImageFile, int pgnum, int imgnum) throws java.lang.Exception
     {
         processFileFormat = (ooFileFormat == null) ? origFileFormat : ooFileFormat;
         
@@ -87,14 +109,18 @@ public class DecompFileProcessor {
         
         switch (handler) {
             case 0:
-                DecompText.replaceImage(xContext, xMCF, xCompDoc, "xxxorigname",
+                DecompText dt = new DecompText();
+                dt.setLoggingLevel(myLogLevel);
+                dt.replaceImage(xContext, xMCF, xCompDoc, "xxxorigname",
                         DecompUtil.fileNameToOOoURL(repImageFile));
                 break;
             case 2:
-                DecompImpress.replaceImage(xContext, xMCF, xCompDoc, "origname",
+                DecompImpress di = new DecompImpress();
+                di.setLoggingLevel(myLogLevel);
+                di.replaceImage(xContext, xMCF, xCompDoc, "origname",
                         DecompUtil.fileNameToOOoURL(repImageFile), pgnum, imgnum);
                 break;
-            case 1:
+            case 1: // Spreadsheets are not currently supported
             default:
                 java.lang.Exception e = new java.lang.Exception("File " + inputFileUrl + " is an unsupported file format");
                 throw e;
@@ -102,7 +128,7 @@ public class DecompFileProcessor {
         return 0;
     }
 
-    public int citeImage(String citationText, String citeImageFile, int pgnum, int imgnum) throws java.lang.Exception
+    private int citeImage(String citationText, String citeImageFile, int pgnum, int imgnum) throws java.lang.Exception
     {
         processFileFormat = (ooFileFormat == null) ? origFileFormat : ooFileFormat;
 
@@ -110,12 +136,17 @@ public class DecompFileProcessor {
 
         switch (handler) {
             case 0:
-                    DecompText.insertImageCitation(xContext, xMCF, xCompDoc,
-                            citationText, DecompUtil.fileNameToOOoURL(citeImageFile), pgnum, imgnum);
+                DecompText dt = new DecompText();
+                dt.setLoggingLevel(myLogLevel);
+                dt.insertImageCitation(xContext, xMCF, xCompDoc, citationText,
+                        DecompUtil.fileNameToOOoURL(citeImageFile), pgnum, imgnum);
                 break;
             case 2:
-                    DecompImpress.insertImageCitation(xContext, xMCF, xCompDoc,
-                            citationText, DecompUtil.fileNameToOOoURL(citeImageFile), pgnum, imgnum);
+                DecompImpress di = new DecompImpress();
+                di.setLoggingLevel(myLogLevel);
+                di.insertImageCitation(xContext, xMCF, xCompDoc, citationText,
+                        DecompUtil.fileNameToOOoURL(citeImageFile), pgnum, imgnum);
+                citations.addCitationEntry(citationText, pgnum, imgnum);
                 break;
             case 1:
             default:
@@ -125,17 +156,21 @@ public class DecompFileProcessor {
         return 0;
     }
 
-    public int extractImages(String outputDirectory) throws java.lang.Exception
+    private int extractImages(String outputDirectory, boolean excludeCustomShapes) throws java.lang.Exception
     {
         outputDir = outputDirectory;
-        return extractImages();
+        return extractImages(excludeCustomShapes);
 
     }
 
-    public int extractImages() throws java.lang.Exception
+    private int extractImages(boolean excludeCustomShapes) throws java.lang.Exception
     {
+        if (outputDir == null) {
+            java.lang.Exception e = new java.lang.Exception("No output directory specified!");
+            throw e;
+        }
         // Possibly save original document as an OO document
-        String newName = DecompUtil.possiblyUseTemporaryDocument(xContext, xMCF,
+        String newName = myutil.possiblyUseTemporaryDocument(xContext, xMCF,
                 xCompDoc, inputFileUrl, origFileFormat);
         if (newName != null) {
             // Save document in another format and process that
@@ -146,7 +181,7 @@ public class DecompFileProcessor {
                 java.lang.Exception e = new java.lang.Exception("Unable to open temporary file " + newName + " for processing");
                 throw e;
             }
-            fileType = DecompUtil.getDocumentType(xContext, xMCF, inputFileUrl);
+            fileType = myutil.getDocumentType(xContext, xMCF, inputFileUrl);
             ooFileFormat = OOoFormat.findFormatWithDocumentType(fileType);
         }
         processFileFormat = (ooFileFormat == null) ? origFileFormat : ooFileFormat;
@@ -155,38 +190,107 @@ public class DecompFileProcessor {
 
         switch (handler) {
             case 0:
-                DecompText.extractImages(xContext, xMCF, xCompDoc, outputDir);
+                DecompText dt = new DecompText();
+                dt.setLoggingLevel(myLogLevel);
+                dt.extractImages(xContext, xMCF, xCompDoc, outputDir, excludeCustomShapes);
                 break;
             case 2:
-                DecompImpress.extractImages(xContext, xMCF, xCompDoc, outputDir);
+                DecompImpress di = new DecompImpress();
+                di.setLoggingLevel(myLogLevel);
+                di.extractImages(xContext, xMCF, xCompDoc, outputDir, excludeCustomShapes);
                 break;
             case 1:
             default:
-                java.lang.Exception e = new java.lang.Exception("File " + newName + " is an unsupported file format");
+                java.lang.Exception e = new java.lang.Exception("File " + newName != null ? newName : inputFileUrl  + " is an unsupported file format");
                 throw e;
+        }
+        // If a temporary file was used, remove it now
+        if (newName != null)
+        {
+            xCompDoc.dispose();
+            DecompUtil.removeTemporaryDocument(newName);
         }
         return 0;
     }
 
-    public void dispose()
+    private void addCitationPages()
     {
-        if (xCompDoc != null)
-            xCompDoc.dispose();
+        int i, j;
+        DecompCitationCollection.DecompCitationCollectionEntry cpe;
+        DecompImpress di;
+
+        if (citations.numEntries() == 0)
+            return;
+
+        DecompCitationCollection.DecompCitationCollectionEntry[] cpeArray = citations.getDecompCitationCollectionEntryArray();
+
+
+        // XXX Should be generic
+        di = new DecompImpress();
+        di.setLoggingLevel(myLogLevel);
+        di.addCitationPages(xCompDoc, cpeArray);
+
+    }
+
+    private int save() throws java.lang.Exception
+    {
+        addCitationPages();
+
+        if (outputFileUrl != null && outputFileUrl.compareTo("") != 0) {
+            mylog.debug("Saving (possibly) modified document to new file, '%s'", outputFileUrl);
+            myutil.storeDocument(xContext, xMCF, xCompDoc, outputFileUrl, origFileFormat.getFilterName());
+        }
+        return 0;
+    }
+
+    public void dispose() throws java.lang.Exception
+    {
+        if (this.xCompDoc != null)
+            this.xCompDoc.dispose();
     }
 
 
-    public int saveTo(String outputFile) {
+    public int saveTo(String outputFile) throws java.lang.Exception
+    {
         outputFileUrl = DecompUtil.fileNameToOOoURL(outputFile);
         return save();
     }
 
-    public int save()
+
+    public int doOperation(DecompParameters dp)
     {
-        if (outputFileUrl != null && outputFileUrl.compareTo("") != 0) {
-            mylog.debug("Saving (possibly) modified document to new file, '%s'\n", outputFileUrl);
-            DecompUtil.storeDocument(xContext, xMCF, xCompDoc, outputFileUrl, origFileFormat.getFilterName());
+        int ret = 1;
+        if (!dp.ValidSingleOp())
+            return 7;
+        try {
+            switch (dp.getOperation()) {
+                case EXTRACT:
+                    ret = this.extractImages(dp.getOutputDir(), dp.getExcludeCustomShapes());
+                    break;
+                case REPLACE:
+                    ret = this.replaceImage(dp.getRepImageFile(), dp.getPageNum(), dp.getImageNum());
+                    break;
+                case CITE:
+                    ret = this.citeImage(dp.getCitationText(), dp.getCitationImageFile(), dp.getPageNum(), dp.getImageNum());
+                    break;
+                case SAVE:
+                    ret = this.saveTo(dp.getOutputFile());
+                    break;
+            }
+//        } catch (com.sun.star.lang.DisposedException de) {
+//            logOperationInformation(dp, de.getMessage());
+//            ret = 2;
+        } catch (java.lang.Exception e) {
+            logOperationInformation(dp, e.getMessage());
+            ret = 2;
+        } finally {
+            return ret;
         }
-        return 0;
     }
 
+    private void logOperationInformation(DecompParameters dp, String exceptionMsg)
+    {
+        mylog.error("Error processing operation on file '%s': %s", dp.getInputFile(), exceptionMsg);
+        mylog.error(dp.toString());
+    }
 }

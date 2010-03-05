@@ -7,13 +7,6 @@
 
 package edu.umich.med.umms;
 
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
-//import org.apache.log4j.*;
-//import org.apache.log4j.Level;
-//import org.apache.log4j.Logger;
-
 import com.sun.star.awt.Point;
 import com.sun.star.awt.Size;
 
@@ -24,8 +17,6 @@ import com.sun.star.beans.UnknownPropertyException;
 import com.sun.star.drawing.XDrawPagesSupplier;
 import com.sun.star.drawing.XDrawPages;
 import com.sun.star.drawing.XDrawPage;
-import com.sun.star.drawing.XDrawPageDuplicator;
-import com.sun.star.drawing.XMasterPageTarget;
 import com.sun.star.drawing.XShapes;
 import com.sun.star.drawing.XShape;
 import com.sun.star.lang.XMultiComponentFactory;
@@ -37,9 +28,11 @@ import com.sun.star.graphic.XGraphic;
 import com.sun.star.graphic.XGraphicProvider;
 
 import com.sun.star.lib.uno.adapter.ByteArrayToXInputStreamAdapter;
-//import com.sun.star.table.BorderLine;
+import com.sun.star.style.ParagraphAdjust;
+import com.sun.star.text.ControlCharacter;
 import com.sun.star.text.XText;
 import com.sun.star.text.XTextCursor;
+import com.sun.star.text.XTextRange;
 
 import com.sun.star.uno.Exception;
 import com.sun.star.uno.UnoRuntime;
@@ -52,25 +45,47 @@ import com.sun.star.uno.XComponentContext;
  */
 public class DecompImpress {
 
-    private static final com.spinn3r.log5j.Logger mylog = com.spinn3r.log5j.Logger.getLogger();
+    private com.spinn3r.log5j.Logger mylog = com.spinn3r.log5j.Logger.getLogger();
+    private org.apache.log4j.Level myLogLevel = org.apache.log4j.Level.WARN;
 
-    public static void extractImages(XComponentContext xContext,
-                                     XMultiComponentFactory xMCF,
-                                     XComponent xCompDoc,
-                                     String outputDir)
+    DecompImpress(org.apache.log4j.Level lvl)
+    {
+        mylog = com.spinn3r.log5j.Logger.getLogger();
+        mylog.setLevel(lvl);
+    }
+    
+    DecompImpress()
+    {
+        mylog = com.spinn3r.log5j.Logger.getLogger();
+    }
+
+    public void setLoggingLevel(org.apache.log4j.Level lvl)
+    {
+        myLogLevel = lvl;
+        mylog.setLevel(myLogLevel);
+    }
+
+    public void extractImages(XComponentContext xContext,
+                              XMultiComponentFactory xMCF,
+                              XComponent xCompDoc,
+                              String outputDir,
+                              boolean excludeCustomShapes)
     {
         // Query for the XDrawPagesSupplier interface
         XDrawPagesSupplier xDrawPagesSuppl =
                 (XDrawPagesSupplier) UnoRuntime.queryInterface(XDrawPagesSupplier.class, xCompDoc);
         if (xDrawPagesSuppl == null) {
-            mylog.error("Cannot get XDrawPagesSupplier interface for Presentation Document???\n");
+            mylog.error("Cannot get XDrawPagesSupplier interface for Presentation Document???");
             System.exit(8);
         }
+        DecompUtil du = new DecompUtil();
+        du.setLoggingLevel(myLogLevel);
+
         try {
             XDrawPages xDrawPages = xDrawPagesSuppl.getDrawPages();
             Object firstPage = xDrawPages.getByIndex(0);
             int pageCount = xDrawPages.getCount();
-            mylog.debug("xDrawPages.getCount returned a value of '%d' pages\n", pageCount);
+            mylog.debug("xDrawPages.getCount returned a value of '%d' pages", pageCount);
             XDrawPage currPage = null;
             Class pageClass = null;
             XPropertySet pageProps = null;
@@ -79,29 +94,29 @@ public class DecompImpress {
             for (int p = 0; p < pageCount; p++) {
                 currPage = getDrawPage(xDrawPages, p);
                 if (currPage == null) {
-                    mylog.error("Failed to get currPage at page %d!\n", p+1);
+                    mylog.error("Failed to get currPage at page %d!", p+1);
                     xCompDoc.dispose();
                     System.exit(22);
                 }
-                mylog.debug("=== Working with page %d ===\n", p+1);
-                DecompUtil.exportContextImage(xContext, xMCF, currPage, outputDir, p+1);
+                mylog.debug("=== Working with page %d ===", p+1);
+                du.exportContextImage(xContext, xMCF, currPage, outputDir, p+1);
 
                 int shapeCount = currPage.getCount();
-                mylog.debug("Page %d has %d shapes\n", p+1, shapeCount);
+                mylog.debug("Page %d has %d shapes", p+1, shapeCount);
                 XShape currShape = null;
 
                 // Loop through all the shapes within the page
                 for (int s = 0; s < shapeCount; s++) {
                     currShape = getPageShape(currPage, s);
                     if (currShape == null) {
-                        mylog.error("Failed to get currShape (%d) from page %d!\n", s+1, p+1);
+                        mylog.error("Failed to get currShape (%d) from page %d!", s+1, p+1);
                         xCompDoc.dispose();
                         System.exit(33);
                     }
                     String currType = currShape.getShapeType();
                     com.sun.star.awt.Size shapeSize = currShape.getSize();
                     com.sun.star.awt.Point shapePoint = currShape.getPosition();
-                    mylog.debug("--- Working with shape %d (At %d:%d, size %dx%d)\ttype: %s---\n", s + 1, shapePoint.X, shapePoint.Y, shapeSize.Width, shapeSize.Height, currType);
+                    mylog.debug("--- Working with shape %d (At %d:%d, size %dx%d)\ttype: %s---", s + 1, shapePoint.X, shapePoint.Y, shapeSize.Width, shapeSize.Height, currType);
 
                     //printShapeProperties(currShape);
 
@@ -113,17 +128,17 @@ public class DecompImpress {
                         String pictureURL = textProps.getPropertyValue("GraphicURL").toString();
                         pictureURL = pictureURL.substring(27);  // Chop off the leading "vnd.sun.star.GraphicObject:"
                         String outName = DecompUtil.constructBaseImageName(outputDir, p+1, s+1);
-                        DecompUtil.extractImageByURL(xContext, xMCF, xCompDoc, pictureURL, outName);
+                        du.extractImageByURL(xContext, xMCF, xCompDoc, pictureURL, outName);
                     } else if (currType.equalsIgnoreCase("com.sun.star.drawing.TableShape")) {
                         mylog.debug("Handling TableShape (%d) on page %d\n", s+1, p+1);
-                        DecompUtil.exportImage(xContext, xMCF, currShape, outputDir, p+1, s+1);
+                        du.exportImage(xContext, xMCF, currShape, outputDir, p+1, s+1);
                     } else if (currType.equalsIgnoreCase("com.sun.star.drawing.GroupShape")) {
                         mylog.debug("Handling GroupShape (%d) on page %d\n", s+1, p+1);
-                        DecompUtil.exportImage(xContext, xMCF, currShape, outputDir, p + 1, s + 1);
+                        du.exportImage(xContext, xMCF, currShape, outputDir, p + 1, s + 1);
                     } else if (currType.equalsIgnoreCase("com.sun.star.drawing.CustomShape")) {
-                        if (!DecompUtil.excludingCustomShapes()) {
+                        if (!excludeCustomShapes) {
                             mylog.debug("Handling CustomShape (%d) on page %d\n", s+1, p+1);
-                            DecompUtil.exportImage(xContext, xMCF, currShape, outputDir, p+1, s+1);
+                            du.exportImage(xContext, xMCF, currShape, outputDir, p+1, s+1);
                         }
                     } else {
                         mylog.debug("SKIPPING unhandled shape type '%s' (%d) on page %d\n", currType, s+1, p+1);
@@ -131,11 +146,14 @@ public class DecompImpress {
                 }
             }
         } catch (IndexOutOfBoundsException ex) {
-            Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
+            mylog.error("extractImages: Caught IndexOutOfBoundsException!");
+            //Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
         } catch (WrappedTargetException ex) {
-            Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
+            mylog.error("extractImages: Caught WrappedTargetException!");
+            //Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
         } catch (UnknownPropertyException ex) {
-            Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
+            mylog.error("extractImages: Caught UnknownPropertyException!");
+            //Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 
@@ -160,13 +178,13 @@ public class DecompImpress {
      * Need to understand the answer to that!
      *
      */
-   public static int replaceImage(XComponentContext xContext,
-                                  XMultiComponentFactory xMCF,
-                                  XComponent xCompDoc,
-                                  String originalImageName,
-                                  String replacementURL,
-                                  int p,
-                                  int s)
+   public int replaceImage(XComponentContext xContext,
+                           XMultiComponentFactory xMCF,
+                           XComponent xCompDoc,
+                           String originalImageName,
+                           String replacementURL,
+                           int p,
+                           int s)
     {
 
         XDrawPage currPage = null;
@@ -182,21 +200,20 @@ public class DecompImpress {
         XDrawPagesSupplier xDrawPagesSuppl =
                 (XDrawPagesSupplier) UnoRuntime.queryInterface(XDrawPagesSupplier.class, xCompDoc);
         if (xDrawPagesSuppl == null) {
-            mylog.error("Cannot get XDrawPagesSupplier interface for Presentation Document???\n");
+            mylog.error("Cannot get XDrawPagesSupplier interface for Presentation Document???");
             return(1);
         }
 
         XDrawPages xDrawPages = xDrawPagesSuppl.getDrawPages();
         int pageCount = xDrawPages.getCount();
 
-        // XXX Avoid these loops, by supplying the page and shape index values???
         try {
             currPage = getDrawPage(xDrawPages, p);
             if (currPage == null) {
-                mylog.error("Failed to get page %d, with index number %d!\n", p+1, p);
+                mylog.error("Failed to get page %d, with index number %d!", p+1, p);
                 return(2);
             }
-            mylog.debug("=== Working with page %d ===\n", p+1);
+            mylog.debug("=== Working with page %d ===", p+1);
             int shapeCount = currPage.getCount();
             mylog.debug("Page %d has %d shapes\n", p+1, shapeCount);
 
@@ -204,20 +221,24 @@ public class DecompImpress {
             currShape = getPageShape(currPage, s);
 
             String currType = currShape.getShapeType();
-            mylog.debug("Working with shape of type: '%s'\n", currType);
+            mylog.debug("Working with shape of type: '%s'", currType);
 
             if (currType.equalsIgnoreCase("com.sun.star.drawing.GraphicObjectShape")) {
                 XPropertySet textProps = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, currShape);
                 String pictureURL = textProps.getPropertyValue("GraphicURL").toString();
-                mylog.debug("The URL for the selected shape is '%s'\n", pictureURL);
+                mylog.debug("The URL for the selected shape is '%s'", pictureURL);
             } else {
-                mylog.debug("The selected shape is not a GraphicObjectShape!\n");
+                mylog.debug("The selected shape is not a GraphicObjectShape!");
                 return(3);
             }
         } catch (UnknownPropertyException ex) {
-            Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
+            mylog.error("ReplaceImage: Caught UnknownPropertyException!");
+            return 5;
+            //Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
         } catch (WrappedTargetException ex) {
-            Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
+            mylog.error("ReplaceImage: Caught WrappedTargetException!");
+            return 6;
+            //Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
         }
 
         // Read the source
@@ -246,55 +267,70 @@ public class DecompImpress {
         return 0;
     }
 
-   public static int insertFullCitation(XComponentContext xContext,
-                                        XMultiComponentFactory xMCF,
-                                        XComponent xCompDoc,
-                                        int p,     // Cited image page number
-                                        int s,     // Cited image shape number
-                                        int cp,    // citation page number
-                                        String citationString,
-                                        String citationLicense,
-                                        String citationLicenseBadgeURL)
-   {
+    private int insertCitationPageText(XShape shape, String text, String fontname, int fontsize,
+            boolean prependParagraph, boolean centerParagraph, boolean doubleSpaced)
+    {
         try {
+            XText xText = (XText) UnoRuntime.queryInterface(XText.class, shape);
+            XTextCursor xTextCursor = xText.createTextCursor();
+            XTextRange cursorRange = (XTextRange) UnoRuntime.queryInterface(XTextRange.class, xTextCursor);
+            XPropertySet xTxtProps = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, xTextCursor);
 
-            XDrawPage xNewPage = createCitationPage(xCompDoc);
-
-            XShape titleShape = DecompUtil.createShape(xCompDoc, new Point(2000, 2000), new Size(20000, 20000), "com.sun.star.presentation.TitleTextShape");
-            XText titleText = (XText) UnoRuntime.queryInterface(XText.class, titleShape);
-            xNewPage.add(titleShape);
-            titleText.setString("Works Cited");
-
-            // Note that the order of operations here is important!!
-            for (int i = 0; i < 10; i++) {
-                StringBuffer fullCite = new StringBuffer();
-                XShape citationShape = DecompUtil.createShape(xCompDoc, new Point(2000, 4000+(i*1000)), new Size(20000, 10), "com.sun.star.drawing.TextShape");
-                xNewPage.add(citationShape);
-                XText citationText = (XText) UnoRuntime.queryInterface(XText.class, citationShape);
-                XTextCursor xTextCursor = citationText.createTextCursor();
-                XPropertySet xTxtProps = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, xTextCursor);
-                xTxtProps.setPropertyValue("CharHeight", 8);
-
-                fullCite.append(citationString);
-                if (citationLicense != null)
-                    fullCite.append(", " + citationLicense);
-                if (citationLicenseBadgeURL != null)
-                    fullCite.append(", " + citationLicenseBadgeURL);
-                citationText.setString(fullCite.toString());
+            xTextCursor.gotoEnd(false);
+            if (prependParagraph)
+                xText.insertControlCharacter(cursorRange, ControlCharacter.PARAGRAPH_BREAK, false);
+            if (centerParagraph)
+                xTxtProps.setPropertyValue("ParaAdjust", ParagraphAdjust.CENTER);
+            if (doubleSpaced) {
+                xTxtProps.setPropertyValue("ParaTopMargin", 200);
             }
-
+            xTxtProps.setPropertyValue("CharFontName", fontname);
+            xTxtProps.setPropertyValue("CharHeight", fontsize);
+            xText.insertString(cursorRange, text, false);
         } catch (java.lang.Exception ex) {
-            Logger.getLogger(DecompImpress.class.getName()).log(Level.SEVERE, null, ex);
+            mylog.error("insertCitationPageText: Caught Exception: " + ex.getMessage());
             return 1;
         }
         return 0;
-   }
+    }
+
+    private int insertFullCitation(XComponent xCompDoc,
+                                   XShape cShape,
+                                   int p,     // Cited image page number
+                                   int s,     // Cited image shape number
+                                   int i,     // index of citation for this page
+                                   String citationString,
+                                   String citationLicense,
+                                   String citationLicenseBadgeURL,
+                                   boolean newParagraph)
+    {
+        try {
+
+            // Note that the order of operations here is important!!
+            StringBuffer fullCite = new StringBuffer();
+
+            fullCite.append("Slide " + p + ", Image " + s + ": ");
+            fullCite.append(citationString);
+            if (citationLicense != null)
+                fullCite.append(", " + citationLicense);
+            if (citationLicenseBadgeURL != null)
+                fullCite.append(", " + citationLicenseBadgeURL);
+            insertCitationPageText(cShape, fullCite.toString(), "Arial", 10, newParagraph, false, true);
+
+        } catch (java.lang.Exception ex) {
+            mylog.error("insertFullCitation: Caught Exception!");
+            //Logger.getLogger(DecompImpress.class.getName()).log(Level.SEVERE, null, ex);
+            return 1;
+        }
+        return 0;
+    }
 
 
-   private static XDrawPage createCitationPage(XComponent xCompDoc)
+   private XShape addCitationPage(XComponent xCompDoc)
    {
-       XDrawPage newPage = null;
-        XDrawPage dupPage = null;
+
+        XDrawPage newPage = null;
+        XShape citeShape = null;
         try {
             XDrawPagesSupplier xDrawPagesSuppl = (XDrawPagesSupplier) UnoRuntime.queryInterface(XDrawPagesSupplier.class, xCompDoc);
             if (xDrawPagesSuppl == null) {
@@ -305,49 +341,49 @@ public class DecompImpress {
             int currentCount = xDrawPages.getCount();
             newPage = xDrawPages.insertNewByIndex(currentCount);
 
+            XShape titleShape = DecompUtil.createShape(xCompDoc, new Point(1000, 1000), new Size(23000, 500), "com.sun.star.drawing.TextShape");
+            newPage.add(titleShape);
+            insertCitationPageText(titleShape, "Additional Source Information", "Arial", 24, false, true, false);
+            insertCitationPageText(titleShape, "for more information see: http://open.umich.edu/wiki/CitationPolicy", "Arial", 12, true, true, false);
 
-            /*
-            Object oLastPage = xDrawPages.getByIndex(currentCount - 1);
-            XDrawPage xLastPage = (XDrawPage) UnoRuntime.queryInterface(XDrawPage.class, oLastPage);
-
-            XMasterPageTarget xMaster = (XMasterPageTarget) UnoRuntime.queryInterface(XMasterPageTarget.class, xLastPage);
-            XDrawPage masterPage = xMaster.getMasterPage();
-            XDrawPageDuplicator xDuplicator = (XDrawPageDuplicator) UnoRuntime.queryInterface(XDrawPageDuplicator.class, xDrawPagesSuppl);
-            dupPage = xDuplicator.duplicate(masterPage);
-
-//            for (int i = currentCount - 1; i >= 0; i--) {
-//                Object oPage = xDrawPages.getByIndex(i);
-//                XDrawPage xPage = (XDrawPage) UnoRuntime.queryInterface(XDrawPage.class, oPage);
-//                xDuplicator.duplicate(xPage);
-//            }
-            //xDuplicator.duplicate(xLastPage);
-             *
-        } catch (IndexOutOfBoundsException ex) {
-            Logger.getLogger(DecompImpress.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (WrappedTargetException ex) {
-            Logger.getLogger(DecompImpress.class.getName()).log(Level.SEVERE, null, ex);
-             */
+            citeShape = DecompUtil.createShape(xCompDoc, new Point(1000, 3000), new Size(23000, 14000), "com.sun.star.drawing.TextShape");
+            newPage.add(citeShape);
         } finally {
-            return newPage;
+            return citeShape;
         }
    }
 
+   public int addCitationPages(XComponent xCompDoc, DecompCitationCollection.DecompCitationCollectionEntry[] entries)
+   {
+       int i;
+       int perPage = 15;
+       XShape cShape = null;
+       XDrawPage cPage = null;
+       DecompCitationCollection.DecompCitationCollectionEntry cpe;
+
+       for (i = 0; i < entries.length; i++)
+       {
+            if (i % perPage == 0)
+                cShape = addCitationPage(xCompDoc);
+
+            cpe = entries[i];
+            boolean newParagraph = (i % perPage != 0);
+            insertFullCitation(xCompDoc, cShape, cpe.pageNum, cpe.imageNum, (i % perPage), cpe.fullCitation, null, null, newParagraph);
+       }
+       return 0;
+   }
    /* XXX  To be completed
       http://www.oooforum.org/forum/viewtopic.phtml?t=45734
     */
-    public static int insertImageCitation(XComponentContext xContext,
-                                          XMultiComponentFactory xMCF,
-                                          XComponent xCompDoc,
-                                          String citationText,
-                                          String citationURL,
-                                          int p,
-                                          int s)
+    public int insertImageCitation(XComponentContext xContext,
+                                   XMultiComponentFactory xMCF,
+                                   XComponent xCompDoc,
+                                   String citationText,
+                                   String citationURL,
+                                   int p,
+                                   int s)
     {
         try {
-
-            /* XXX Just testing this here! XXX */
-            insertFullCitation(xContext, xMCF, xCompDoc, 2, 3, 0, citationText, "This is the License info", "http://badge.url");
-            /* XXX Just testing this here! XXX */
 
             XDrawPage drawPage = getDrawPageByIndex(xCompDoc, p);
             if (drawPage == null)
@@ -395,21 +431,23 @@ public class DecompImpress {
             XTextCursor xTextCursor = xText.createTextCursor();
             XPropertySet xTxtProps = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, xTextCursor);
 
+            xTxtProps.setPropertyValue("CharFontName", "Arial");
             xTxtProps.setPropertyValue("CharHeight", 8);
-            xTxtProps.setPropertyValue("CharColor", new Integer(0xffffff));
+//            xTxtProps.setPropertyValue("CharColor", new Integer(0xffffff));
             xText.setString(citationText);
             //xTxtProps.setPropertyValue("HyperLinkURL", "http://open.umich.edu"); // XXX Doesn't work for impress documents.
             //xText.setString("CC-BY");
 
         } catch (java.lang.Exception ex) {
-            Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
+            mylog.error("insertImageCitation: Caught exception: " + ex.getMessage());
+//            Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
             return 1;
         }
         return 0;
     }
 
 
-    private static XDrawPage getDrawPageByIndex(XComponent xCompDoc, int nIndex)
+    private XDrawPage getDrawPageByIndex(XComponent xCompDoc, int nIndex)
     {
         XDrawPagesSupplier xDrawPagesSuppl =
                 (XDrawPagesSupplier) UnoRuntime.queryInterface(XDrawPagesSupplier.class, xCompDoc);
@@ -423,7 +461,7 @@ public class DecompImpress {
         return getDrawPage(xDrawPages, nIndex);
     }
 
-    private static XDrawPage getDrawPage(XDrawPages xDrawPages, int nIndex)
+    private XDrawPage getDrawPage(XDrawPages xDrawPages, int nIndex)
     {
         XDrawPage xDP = null;
         try {
@@ -437,7 +475,7 @@ public class DecompImpress {
         }
     }
 
-    private static XShape getPageShape(XDrawPage xDrawPage, int nIndex)
+    private XShape getPageShape(XDrawPage xDrawPage, int nIndex)
     {
         XShape xShape = null;
         try {
@@ -451,7 +489,7 @@ public class DecompImpress {
         }
     }
 
-    private static int insertLicenseButton()
+    private int insertLicenseButton()
     {
         return 0;
     }

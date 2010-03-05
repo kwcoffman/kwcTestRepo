@@ -6,13 +6,10 @@
 package edu.umich.med.umms;
 
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.FileReader;
-import java.util.ArrayList;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import java.util.Collection;
 
 /**
  *
@@ -38,6 +35,7 @@ public class DecompJson {
             private String citationText;
             private int pageNum;
             private int imageNum;
+            //private String logLevel;
 
             public DecompFileOp() {
             }
@@ -53,6 +51,9 @@ public class DecompJson {
             return this.inputFile;
         }
         public DecompOperation getOperation(int i) {
+            if (this.decompFileOps[i].operation == null)
+                return null;
+
             if (this.decompFileOps[i].operation.equalsIgnoreCase("extract"))
                 return DecompOperation.EXTRACT;
             if (this.decompFileOps[i].operation.equalsIgnoreCase("replace"))
@@ -84,6 +85,28 @@ public class DecompJson {
         public int getImageNum(int i) {
             return this.decompFileOps[i].imageNum;
         }
+/*
+        public org.apache.log4j.Level getLogLevel(int i) {
+            if (this.decompFileOps[i].logLevel == null)
+                return null;
+
+            if (this.decompFileOps[i].logLevel.equalsIgnoreCase("debug"))
+                return org.apache.log4j.Level.DEBUG;
+            if (this.decompFileOps[i].logLevel.equalsIgnoreCase("all"))
+                return org.apache.log4j.Level.ALL;
+            if (this.decompFileOps[i].logLevel.equalsIgnoreCase("off"))
+                return org.apache.log4j.Level.OFF;
+            if (this.decompFileOps[i].logLevel.equalsIgnoreCase("info"))
+                return org.apache.log4j.Level.INFO;
+            if (this.decompFileOps[i].logLevel.equalsIgnoreCase("warn"))
+                return org.apache.log4j.Level.WARN;
+            if (this.decompFileOps[i].logLevel.equalsIgnoreCase("error"))
+                return org.apache.log4j.Level.ERROR;
+            if (this.decompFileOps[i].logLevel.equalsIgnoreCase("fatal"))
+                return org.apache.log4j.Level.FATAL;
+            return null;
+        }
+ */
     }
 
 
@@ -120,60 +143,3 @@ public class DecompJson {
         return this.decompFiles[i];
     }
 }
-
-/*
-public class DecompJson {
-
-    private int id;
-    private int version;
-    private ArrayList<DecompFile> decompFiles = new ArrayList<DecompFile>();
-
-    static private class DecompFile{
-        private String inputFile;
-        private ArrayList<DecompFileOp> decompFileOps = new ArrayList<DecompFileOp>();
-
-        static private class DecompFileOp {
-            private String optype;  //private DecompOperation optype;
-            private String outputFile;
-            private String outputDir;
-            private String repImageFile;
-            private String citationText;
-            private int pageNum;
-            private int imageNum;
-
-            public DecompFileOp() {
-                System.err.println("DecompFileOp constructor invoked!");
-            }
-        }
-
-        public DecompFile() {
-            System.err.println("DecompFile constructor invoked!");
-        }
-    }
-
-
-    public DecompJson() {
-        System.err.println("DecompJson constructor invoked!");
-    }
-
-    public DecompJson(String filename) throws IOException, java.lang.Exception {
-        Reader reader = new FileReader(filename);
-
-        Gson gson = new GsonBuilder().create();
-
-        DecompJson d = gson.fromJson(reader, DecompJson.class);
-
-        this.id = d.id;
-        this.version = d.version;
-        this.decompFiles = d.decompFiles;
-
-        reader.close();
-    }
-    public int getVersion() {
-        return this.version;
-    }
-    public int getId() {
-        return this.id;
-    }
-}
-*/
