@@ -13,12 +13,20 @@ import com.sun.star.awt.Size;
 import com.sun.star.beans.PropertyValue;
 import com.sun.star.beans.XPropertySet;
 import com.sun.star.beans.UnknownPropertyException;
+import com.sun.star.datatransfer.XTransferable;
 
 import com.sun.star.drawing.XDrawPagesSupplier;
 import com.sun.star.drawing.XDrawPages;
 import com.sun.star.drawing.XDrawPage;
+import com.sun.star.drawing.XDrawPageDuplicator;
 import com.sun.star.drawing.XShapes;
 import com.sun.star.drawing.XShape;
+import com.sun.star.frame.XController;
+import com.sun.star.frame.XDesktop;
+import com.sun.star.frame.XDispatchHelper;
+import com.sun.star.frame.XDispatchProvider;
+import com.sun.star.frame.XFrame;
+import com.sun.star.frame.XModel;
 import com.sun.star.lang.XMultiComponentFactory;
 import com.sun.star.lang.XComponent;
 import com.sun.star.lang.IndexOutOfBoundsException;
@@ -446,7 +454,120 @@ public class DecompImpress {
         return 0;
     }
 
+    public int insertFrontBoilerplate(XComponentContext xContext,
+                                      XDesktop xDesktop,
+                                      XMultiComponentFactory xMCF,
+                                      XComponent destDoc,
+                                      String sourceFile,
+                                      String sourceFormat)
+    {
+/*
+        String sourceFileUrl = DecompUtil.fileNameToOOoURL(sourceFile);
+        XComponent sourceDoc = null;
+        XDrawPagesSupplier destPagesSuppl;
+        XDrawPagesSupplier sourcePagesSuppl;
 
+        try {
+            sourceDoc = DecompUtil.openFileForProcessing(xDesktop, sourceFileUrl);
+        } catch (java.lang.Exception ex) {
+            mylog.error("insertFrontMatter: Exception while opening source file: " + sourceFile);
+            return 1;
+        }
+        // Query for the XDrawPagesSupplier interfaces
+        sourcePagesSuppl =
+                (XDrawPagesSupplier) UnoRuntime.queryInterface(XDrawPagesSupplier.class, sourceDoc);
+        if (sourcePagesSuppl == null) {
+            mylog.error("Cannot get XDrawPagesSupplier interface for source Presentation Document???");
+            sourceDoc.dispose();
+            return 1;
+        }
+
+        destPagesSuppl =
+                (XDrawPagesSupplier) UnoRuntime.queryInterface(XDrawPagesSupplier.class, destDoc);
+        if (destPagesSuppl == null) {
+            mylog.error("Cannot get XDrawPagesSupplier interface for destination Presentation Document???");
+            sourceDoc.dispose();
+            return 1;
+        }
+
+        XDrawPageDuplicator destDuplicator = UnoRuntime.queryInterface(XDrawPageDuplicator.class, destDoc);
+
+        XDrawPages sourceDrawPages = sourcePagesSuppl.getDrawPages();
+        XDrawPages destDrawPages = destPagesSuppl.getDrawPages();
+        int sourceCount = sourceDrawPages.getCount();
+
+        for (int i = 0; i < sourceCount; i++) {
+            XDrawPage sourcePage = getDrawPageByIndex(sourceDoc, i);
+
+            XTransferable xTransferable = UnoRuntime.queryInterface(XTransferable.class, sourcePage);
+
+            XShape sourceGroupShape = getPageGroupShape(sourcePage);
+            if (sourceGroupShape != null) {
+                // Create new dest slide, copy source shape there
+                XDrawPage newDestPage = destDrawPages.insertNewByIndex(i-1);
+                newDestPage.add(sourceGroupShape);
+            }
+//            destDuplicator.duplicate(sourcePage);
+//            XDrawPage newPage = destDrawPages.insertNewByIndex(i);
+        }
+        sourceDoc.dispose();
+ */
+        PropertyValue props[] = new PropertyValue[2];
+
+        //executeDispatch(xContext, xDesktop, xMCF, destDoc, ".uno:SelectAll", props);
+        //executeDispatch(xContext, xDesktop, xMCF, destDoc, ".uno:Copy", props);
+        //executeDispatch(xContext, xDesktop, xMCF, destDoc, ".uno:Paste", props);
+        //executeDispatch(xContext, xDesktop, xMCF, destDoc, ".uno:Paste", props);
+
+//        props[0] = new PropertyValue();
+//        props[0].Name = "URL";
+//        props[0].Value = DecompUtil.fileNameToOOoURL(sourceFile);
+
+        props[0] = new PropertyValue();
+        props[0].Name = "FileName";
+        props[0].Value = new String(sourceFile);
+
+        props[1] = new PropertyValue();
+        props[1].Name = "FilterName";
+        props[1].Value = sourceFormat;
+
+        executeDispatch(xContext, xDesktop, xMCF, destDoc, ".uno:ImportFromFile", props);
+
+        return 0;
+    }
+
+    // Based on http://www.oooforum.org/forum/viewtopic.phtml?t=48271
+    private void executeDispatch(XComponentContext xContext,
+                                 XDesktop xDesktop,
+                                 XMultiComponentFactory xMCF,
+                                 Object pobjDoc,
+                                 String cmd,
+                                 PropertyValue[] props)
+    {
+        try {
+            XModel xModel = (XModel) UnoRuntime.queryInterface(XModel.class, pobjDoc);
+            XController xController = xModel.getCurrentController();
+            XFrame xFrame = xController.getFrame();
+            XDispatchProvider impressDispatchProvider = (XDispatchProvider) UnoRuntime.queryInterface(XDispatchProvider.class, xFrame);
+            Object oDispatchHelper = xMCF.createInstanceWithContext("com.sun.star.frame.DispatchHelper", xContext);
+            XDispatchHelper dispatchHelper = (XDispatchHelper) UnoRuntime.queryInterface(XDispatchHelper.class, oDispatchHelper);
+            printDispatchInfo(cmd, props);
+            dispatchHelper.executeDispatch(impressDispatchProvider, cmd, "", 0, props);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        } catch (java.lang.Exception ex) {
+            mylog.error("executeDispatch: Yikes!: " + ex.getMessage());
+        }
+    }
+
+    private void printDispatchInfo(String cmd, PropertyValue[] props)
+    {
+        mylog.error("Executing dispatch command '%s' with parameters:", cmd);
+        for (int i = 0; i < props.length; i++) {
+            mylog.error("\t'%s': '%s'", props[i].Name, props[i].Value);
+        }
+    }
+    
     private XDrawPage getDrawPageByIndex(XComponent xCompDoc, int nIndex)
     {
         XDrawPagesSupplier xDrawPagesSuppl =
@@ -489,6 +610,27 @@ public class DecompImpress {
         }
     }
 
+    // ASSumes there is a single group shape on the page,
+    // therefore returns the first one found...
+    private XShape getPageGroupShape(XDrawPage xDrawPage)
+    {
+        XShape xShape = null;
+        int shapeCount = xDrawPage.getCount();
+        try {
+            for (int i = 0; i < shapeCount; i++) {
+                xShape = getPageShape(xDrawPage, i);
+                String currType = xShape.getShapeType();
+                if (currType.equalsIgnoreCase("com.sun.star.drawing.GroupShape")) {
+                    return xShape;
+                }
+            }
+            return null;
+        } catch (java.lang.Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+    
     private int insertLicenseButton()
     {
         return 0;

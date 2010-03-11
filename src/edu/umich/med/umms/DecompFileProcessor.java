@@ -232,9 +232,17 @@ public class DecompFileProcessor {
 
     }
 
+    public void addFrontMatter(String originFile, String originFormat)
+    {
+        DecompImpress di = new DecompImpress();
+        di.setLoggingLevel(myLogLevel);
+        di.insertFrontBoilerplate(xContext, xDesktop, xMCF, xCompDoc, originFile, originFormat);
+    }
+    
     private int save() throws java.lang.Exception
     {
         addCitationPages();
+        addFrontMatter("/Users/kwc/Downloads/RecompBoilerplate.ppt", "Microsoft PowerPoint 97/2000/XP");
 
         if (outputFileUrl != null && outputFileUrl.compareTo("") != 0) {
             mylog.debug("Saving (possibly) modified document to new file, '%s'", outputFileUrl);

@@ -99,9 +99,10 @@ public class DecompUtil {
         propertyValues[0].Name = "Hidden";
         propertyValues[0].Value = new Boolean(false);
 
-        propertyValues[1] = new PropertyValue();
-        propertyValues[1].Name = "ReadOnly";
-        propertyValues[1].Value = new Boolean(true);
+        // XXX Restore to READ-ONLY?  Or add an option to the function?
+//        propertyValues[1] = new PropertyValue();
+//        propertyValues[1].Name = "ReadOnly";
+//        propertyValues[1].Value = new Boolean(true);
 
 //        propertyValues[2] = new PropertyValue();
 //        propertyValues[2].Name = "FilterName";
