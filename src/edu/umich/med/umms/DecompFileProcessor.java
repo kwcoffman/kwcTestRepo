@@ -213,6 +213,9 @@ public class DecompFileProcessor {
         return 0;
     }
 
+    /*
+     * This is only used for PowerPoint files
+     */
     private void addCitationPages()
     {
         int i, j;
@@ -224,26 +227,29 @@ public class DecompFileProcessor {
 
         DecompCitationCollection.DecompCitationCollectionEntry[] cpeArray = citations.getDecompCitationCollectionEntryArray();
 
-
-        // XXX Should be generic
         di = new DecompImpress();
         di.setLoggingLevel(myLogLevel);
         di.addCitationPages(xCompDoc, cpeArray);
 
     }
 
-    public void addFrontMatter(String originFile, String originFormat)
+    /*
+     * This is only used for PowerPoint files
+     */
+    public void addFrontMatter(String originFile)
     {
         DecompImpress di = new DecompImpress();
         di.setLoggingLevel(myLogLevel);
-        di.insertFrontBoilerplate(xContext, xDesktop, xMCF, xCompDoc, originFile, originFormat);
+        di.insertFrontBoilerplate(xContext, xDesktop, xMCF, xCompDoc, originFile);
     }
     
     private int save() throws java.lang.Exception
     {
-        addCitationPages();
-//        addFrontMatter("/Users/kwc/Downloads/RecompBoilerplate.ppt", "Microsoft PowerPoint 97/2000/XP");
-        addFrontMatter("/Users/kwc/Downloads/RecompBoilerplate.ppt", "MS PowerPoint 97 Vorlage");
+        // Do some extra work for PowerPoint files
+        if (origFileFormat.getHandlerType() == 2) {
+            addCitationPages();
+            addFrontMatter("/Users/kwc/Downloads/RecompBoilerplate.ppt");  // XXX This needs to be a parameter!!
+        }
 
         if (outputFileUrl != null && outputFileUrl.compareTo("") != 0) {
             mylog.debug("Saving (possibly) modified document to new file, '%s'", outputFileUrl);

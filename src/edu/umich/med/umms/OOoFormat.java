@@ -109,7 +109,7 @@ public enum OOoFormat {
     }
 
 
-    public static OOoFormat findFormatForFilterName(String filterName) {
+    public static OOoFormat findFormatWithFilterName(String filterName) {
         OOoFormat[] formats =  OOoFormat.values();
         for (OOoFormat format:formats) {
             if (format.getFilterName().equals(filterName)) {
