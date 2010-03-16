@@ -26,6 +26,7 @@ import com.sun.star.frame.XDesktop;
 import com.sun.star.frame.XDispatchHelper;
 import com.sun.star.frame.XDispatchProvider;
 import com.sun.star.frame.XFrame;
+import com.sun.star.frame.XFrameActionListener;
 import com.sun.star.frame.XModel;
 import com.sun.star.lang.XMultiComponentFactory;
 import com.sun.star.lang.XComponent;
@@ -380,6 +381,7 @@ public class DecompImpress {
        }
        return 0;
    }
+   
    /* XXX  To be completed
       http://www.oooforum.org/forum/viewtopic.phtml?t=45734
     */
@@ -458,21 +460,22 @@ public class DecompImpress {
                                       XDesktop xDesktop,
                                       XMultiComponentFactory xMCF,
                                       XComponent destDoc,
-                                      String sourceFile,
-                                      String sourceFormat)
+                                      String fileName,
+                                      String filterName)
     {
-/*
-        String sourceFileUrl = DecompUtil.fileNameToOOoURL(sourceFile);
         XComponent sourceDoc = null;
+        String sourceFileUrl = DecompUtil.fileNameToOOoURL(fileName);
         XDrawPagesSupplier destPagesSuppl;
         XDrawPagesSupplier sourcePagesSuppl;
+        PropertyValue props[] = new PropertyValue[0];
 
         try {
             sourceDoc = DecompUtil.openFileForProcessing(xDesktop, sourceFileUrl);
         } catch (java.lang.Exception ex) {
-            mylog.error("insertFrontMatter: Exception while opening source file: " + sourceFile);
+            mylog.error("insertFrontBoilerplate: Exception while opening source file: " + fileName);
             return 1;
         }
+
         // Query for the XDrawPagesSupplier interfaces
         sourcePagesSuppl =
                 (XDrawPagesSupplier) UnoRuntime.queryInterface(XDrawPagesSupplier.class, sourceDoc);
@@ -481,39 +484,31 @@ public class DecompImpress {
             sourceDoc.dispose();
             return 1;
         }
-
-        destPagesSuppl =
-                (XDrawPagesSupplier) UnoRuntime.queryInterface(XDrawPagesSupplier.class, destDoc);
-        if (destPagesSuppl == null) {
-            mylog.error("Cannot get XDrawPagesSupplier interface for destination Presentation Document???");
-            sourceDoc.dispose();
-            return 1;
-        }
-
-        XDrawPageDuplicator destDuplicator = UnoRuntime.queryInterface(XDrawPageDuplicator.class, destDoc);
-
         XDrawPages sourceDrawPages = sourcePagesSuppl.getDrawPages();
-        XDrawPages destDrawPages = destPagesSuppl.getDrawPages();
         int sourceCount = sourceDrawPages.getCount();
 
         for (int i = 0; i < sourceCount; i++) {
             XDrawPage sourcePage = getDrawPageByIndex(sourceDoc, i);
 
-            XTransferable xTransferable = UnoRuntime.queryInterface(XTransferable.class, sourcePage);
+//            executeDispatch(xContext, xDesktop, xMCF, sourceDoc, ".uno:DuplicatePage", props);
 
-            XShape sourceGroupShape = getPageGroupShape(sourcePage);
-            if (sourceGroupShape != null) {
-                // Create new dest slide, copy source shape there
-                XDrawPage newDestPage = destDrawPages.insertNewByIndex(i-1);
-                newDestPage.add(sourceGroupShape);
-            }
-//            destDuplicator.duplicate(sourcePage);
-//            XDrawPage newPage = destDrawPages.insertNewByIndex(i);
+            //executeDispatch(xContext, xDesktop, xMCF, sourceDoc, ".uno:GrabControlFocus", props);
+            executeDispatch(xContext, xDesktop, xMCF, sourceDoc, ".uno:DrawingMode", props);
+            executeDispatch(xContext, xDesktop, xMCF, sourceDoc, ".uno:SelectAll", props);
+            executeDispatch(xContext, xDesktop, xMCF, sourceDoc, ".uno:Copy", props);
+            //DecompUtil.sleepFor(2);
+
+            //executeDispatch(xContext, xDesktop, xMCF, destDoc, ".uno:GrabControlFocus", props);
+            executeDispatch(xContext, xDesktop, xMCF, destDoc, ".uno:InsertPage", props);
+            executeDispatch(xContext, xDesktop, xMCF, destDoc, ".uno:Paste", props);
+            executeDispatch(xContext, xDesktop, xMCF, destDoc, ".uno:Paste", props);
+
+            executeDispatch(xContext, xDesktop, xMCF, sourceDoc, ".uno:DeletePage", props);
+
+            //DecompUtil.sleepFor(2);
         }
         sourceDoc.dispose();
- */
-        PropertyValue props[] = new PropertyValue[2];
-
+/*
         //executeDispatch(xContext, xDesktop, xMCF, destDoc, ".uno:SelectAll", props);
         //executeDispatch(xContext, xDesktop, xMCF, destDoc, ".uno:Copy", props);
         //executeDispatch(xContext, xDesktop, xMCF, destDoc, ".uno:Paste", props);
@@ -521,18 +516,24 @@ public class DecompImpress {
 
 //        props[0] = new PropertyValue();
 //        props[0].Name = "URL";
-//        props[0].Value = DecompUtil.fileNameToOOoURL(sourceFile);
+//        props[0].Value = DecompUtil.fileNameToOOoURL(fileName);
 
         props[0] = new PropertyValue();
         props[0].Name = "FileName";
-        props[0].Value = new String(sourceFile);
+        props[0].Value = new String(fileName);
 
         props[1] = new PropertyValue();
         props[1].Name = "FilterName";
-        props[1].Value = sourceFormat;
+        props[1].Value = new String(filterName);
 
-        executeDispatch(xContext, xDesktop, xMCF, destDoc, ".uno:ImportFromFile", props);
+//        props[2] = new PropertyValue();
+//        props[2].Name = "AsLink";
+//        props[2].Value = new Boolean(false);
 
+//        executeDispatch(xContext, xDesktop, xMCF, destDoc, ".uno:ImportFromFile", props);
+
+        executeDispatch(xContext, xDesktop, xMCF, destDoc, ".uno:SelectAll", props);
+*/
         return 0;
     }
 
@@ -548,11 +549,20 @@ public class DecompImpress {
             XModel xModel = (XModel) UnoRuntime.queryInterface(XModel.class, pobjDoc);
             XController xController = xModel.getCurrentController();
             XFrame xFrame = xController.getFrame();
+            mylog.error("executeDispatch: The name of the frame is " + xFrame.getName());
+            if (!xFrame.isActive())
+                xFrame.activate();
             XDispatchProvider impressDispatchProvider = (XDispatchProvider) UnoRuntime.queryInterface(XDispatchProvider.class, xFrame);
             Object oDispatchHelper = xMCF.createInstanceWithContext("com.sun.star.frame.DispatchHelper", xContext);
             XDispatchHelper dispatchHelper = (XDispatchHelper) UnoRuntime.queryInterface(XDispatchHelper.class, oDispatchHelper);
+
+//            Object oListener = xMCF.createInstanceWithContext("com.sun.star.awt.XTopWindowListener", xContext);
+//            XFrameActionListener xListener = (XFrameActionListener) UnoRuntime.queryInterface(XFrameActionListener.class, oListener);
+//            xFrame.addFrameActionListener(xListener);
+
             printDispatchInfo(cmd, props);
             dispatchHelper.executeDispatch(impressDispatchProvider, cmd, "", 0, props);
+            xFrame.contextChanged();
         } catch (Exception e) {
             throw new RuntimeException(e);
         } catch (java.lang.Exception ex) {
@@ -563,8 +573,11 @@ public class DecompImpress {
     private void printDispatchInfo(String cmd, PropertyValue[] props)
     {
         mylog.error("Executing dispatch command '%s' with parameters:", cmd);
+        if (props == null)
+            return;
         for (int i = 0; i < props.length; i++) {
-            mylog.error("\t'%s': '%s'", props[i].Name, props[i].Value);
+            if (props[i] != null)
+                mylog.error("   '%s': '%s'", props[i].Name, props[i].Value);
         }
     }
     

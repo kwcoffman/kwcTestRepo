@@ -647,4 +647,15 @@ public class DecompUtil {
         return returnBytes;
     }
 
+    public static void sleepFor(int seconds)
+    {
+        long sleeptime = seconds * 1000;
+        try {
+            System.err.printf("Sleeping for %d seconds... ", seconds);
+            Thread.sleep(sleeptime);
+            System.err.printf("awake\n");
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
 }

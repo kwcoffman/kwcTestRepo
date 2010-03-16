@@ -242,7 +242,8 @@ public class DecompFileProcessor {
     private int save() throws java.lang.Exception
     {
         addCitationPages();
-        addFrontMatter("/Users/kwc/Downloads/RecompBoilerplate.ppt", "Microsoft PowerPoint 97/2000/XP");
+//        addFrontMatter("/Users/kwc/Downloads/RecompBoilerplate.ppt", "Microsoft PowerPoint 97/2000/XP");
+        addFrontMatter("/Users/kwc/Downloads/RecompBoilerplate.ppt", "MS PowerPoint 97 Vorlage");
 
         if (outputFileUrl != null && outputFileUrl.compareTo("") != 0) {
             mylog.debug("Saving (possibly) modified document to new file, '%s'", outputFileUrl);
