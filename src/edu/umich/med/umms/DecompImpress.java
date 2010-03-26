@@ -194,13 +194,13 @@ public class DecompImpress {
      * Need to understand the answer to that!
      *
      */
-   public int replaceImage(XComponentContext xContext,
-                           XMultiComponentFactory xMCF,
-                           XComponent xCompDoc,
-                           String originalImageName,
-                           String replacementURL,
-                           int p,
-                           int s)
+    public int replaceImage(XComponentContext xContext,
+                            XMultiComponentFactory xMCF,
+                            XComponent xCompDoc,
+                            String originalImageName,
+                            String replacementURL,
+                            int p,
+                            int s)
     {
 
         XDrawPage currPage = null;
@@ -442,7 +442,8 @@ public class DecompImpress {
      * @param fullCitation
      * @param whichpart
      * @return
-     */    private String parseFullCitation(String fullCitation, int whichpart)
+     */
+    private String parseFullCitation(String fullCitation, int whichpart)
     {
         final String REGEXP = "(.*) (http://.*), (.*) (http://.*)";
         Pattern fullPattern = Pattern.compile(REGEXP);
@@ -482,7 +483,8 @@ public class DecompImpress {
      *
      * @param fullCitation
      * @return
-     */private String getShortCitation(String fullCitation)
+     */
+    private String getShortCitation(String fullCitation)
     {
         return parseFullCitation(fullCitation, 1);
     }
@@ -504,7 +506,8 @@ public class DecompImpress {
      *
      * @param licenseURL
      * @return
-     */private String getBadgeURLfromLicenseURL(String licenseURL)
+     */
+    private String getBadgeURLfromLicenseURL(String licenseURL)
     {
         final String URLEXP = "http://.*\\.?creativecommons.org/licenses/([^/]*)/([^/]*)/?";
         boolean urlFound = false;
@@ -809,5 +812,4 @@ public class DecompImpress {
             return null;
         }
     }
-    
 }
