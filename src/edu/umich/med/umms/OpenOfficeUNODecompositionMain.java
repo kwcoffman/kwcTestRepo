@@ -32,11 +32,13 @@ public class OpenOfficeUNODecompositionMain {
         Options opt = new Options();
         DecompParameters dp = new DecompParameters();
         int err = 1;
+        String errstring = null;
         OpenOfficeUNODecomposition decomp = new OpenOfficeUNODecomposition();
 
         decomp.defineOptions(opt);
         err = decomp.processArguments(opt, args, dp);
         if (err != 0) {
+            mylog.fatal("Error processing arguments");
             System.exit(1);
         }
 
@@ -45,7 +47,7 @@ public class OpenOfficeUNODecompositionMain {
             xContext = Bootstrap.bootstrap();
         } catch (com.sun.star.comp.helper.BootstrapException e) {
             mylog.fatal("Error connecting to OpenOffice process: " + e.getMessage());
-            System.exit(3);
+            System.exit(2);
         }
 
         // get the remote office service manager
@@ -62,15 +64,19 @@ public class OpenOfficeUNODecompositionMain {
                     xContext));
         } catch (com.sun.star.uno.Exception e) {
             mylog.fatal("Error getting OpenOffice desktop: " + e.getMessage());
-            System.exit(4);
+            System.exit(3);
         }
 
         if (dp.getOperation() == DecompOperation.JSON) {
-            err = decomp.processJsonFile(xContext, xDesktop, dp);
+            errstring = decomp.processJsonFile(xContext, xDesktop, dp);
         } else {
-            err = decomp.processSingleFile(xContext, xDesktop, dp);
+            errstring = decomp.processSingleFile(xContext, xDesktop, dp);
         }
 
-        System.exit(err);
+        if (errstring != null) {
+            mylog.error(errstring);
+            System.exit(1);
+        }
+        System.exit(0);
     }
 }

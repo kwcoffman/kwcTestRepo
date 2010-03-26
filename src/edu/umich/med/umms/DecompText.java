@@ -84,7 +84,7 @@ public class DecompText {
     }
 
     /* Extract Images using indexes rather than names */
-    public void extractImages(XComponentContext xContext,
+    public int extractImages(XComponentContext xContext,
                                      XMultiComponentFactory xMCF,
                                      XComponent xCompDoc,
                                      String outputDir,
@@ -97,7 +97,7 @@ public class DecompText {
                     (XTextDocument) UnoRuntime.queryInterface(XTextDocument.class, xCompDoc);
         if (xTextDoc == null) {
             mylog.error("Cannot get XTextDocument interface for Text Document???");
-            System.exit(7);
+            return 7;
         }
 
         try {
@@ -126,7 +126,9 @@ public class DecompText {
             }
         } catch (Exception ex) {
             Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
+            return 40;
         }
+        return 0;
     }
 
     private Object getImageObject(XTextDocument xTextDoc, int s)
@@ -224,7 +226,7 @@ public class DecompText {
 
             XGraphic xGraphic = xGraphicProvider.queryGraphic(sourceProps);
 
-            XPropertySet origProps = DecompUtil.duplicateObjectPropertySet(xImageObject);
+            XPropertySet origProps = DecompUtil.getObjectPropertySet(xImageObject);
 
 
             origProps.setPropertyValue("Graphic", xGraphic);

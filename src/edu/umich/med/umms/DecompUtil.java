@@ -93,13 +93,15 @@ public class DecompUtil {
 
     public static XComponent openFileForProcessing(XDesktop xDesktop, String inputFileUrl) throws java.lang.Exception
     {
+        com.spinn3r.log5j.Logger locallog = com.spinn3r.log5j.Logger.getLogger();
+        locallog.debug("Opening file '%s'\n", inputFileUrl);
         // Set up to load the document
         PropertyValue propertyValues[] = new PropertyValue[3];
         propertyValues[0] = new PropertyValue();
         propertyValues[0].Name = "Hidden";
-        propertyValues[0].Value = new Boolean(false);
+        propertyValues[0].Value = new Boolean(true);
 
-        // XXX Restore to READ-ONLY?  Or add an option to the function?
+// XXX Restore to READ-ONLY?  Or add an option to the function?
 //        propertyValues[1] = new PropertyValue();
 //        propertyValues[1].Name = "ReadOnly";
 //        propertyValues[1].Value = new Boolean(true);
@@ -108,13 +110,6 @@ public class DecompUtil {
 //        propertyValues[2].Name = "FilterName";
 //        propertyValues[2].Value = new String("pdf_Portable_Document_Format");
 
-//            String sFileName = "/Users/kwc/Downloads/OER/2009-civic-sedan-brochure-OO-modified.odg";
-//            String sFileName = "/Users/kwc/Downloads/OER/2009-civic-sedan-brochure.pdf";
-//            String sFileName = "/Users/kwc/Downloads/OER/2009-civic-sedan-brochure.reallyapdf";
-
-        // Load the document
-        //System.out.print("Opening file '" + sFileName + "' ... ");
-        //String sFileUrl = fileNameToOOoURL(inputFile);
 
         XComponentLoader xCompLoader = (XComponentLoader)
                 UnoRuntime.queryInterface(XComponentLoader.class, xDesktop);
@@ -123,11 +118,9 @@ public class DecompUtil {
         return xCompLoader.loadComponentFromURL(inputFileUrl, "_blank", 0, propertyValues);
     }
 
-    public static XPropertySet duplicateObjectPropertySet(Object origObj)
+    public static XPropertySet getObjectPropertySet(Object origObj)
     {
         XPropertySet xPropSet = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, origObj);
-//        XPropertySetInfo origPropSet = xPropSet.getPropertySetInfo();
-//        Property[] origProps = origPropSet.getProperties();
         return xPropSet;
     }
 
@@ -202,10 +195,10 @@ public class DecompUtil {
     }
 
     // Assumes that the original image shape is supplied
-    public static Point calculateCitationImagePosition(XShape xShape)
+    public static Point calculateCitationImagePosition(XShape xOrigImage)
     {
-        Point aPos = xShape.getPosition();
-        Size aSize = xShape.getSize();
+        Point aPos = xOrigImage.getPosition();
+        Size aSize = xOrigImage.getSize();
         Point citationPos = new Point();
 
         citationPos.X = aPos.X;
@@ -213,23 +206,30 @@ public class DecompUtil {
         return citationPos;
     }
 
-    // Assumes that the citation image shape is supplied
-    public static Point calculateCitationTextPosition(XShape xShape)
+    // Assumes that the original image shape is supplied, and perhaps the citation image shape
+    public static Point calculateCitationTextPosition(XShape xOrigImage, XShape xCiteImage)
     {
-        Point aPos = xShape.getPosition();
-        Size aSize = xShape.getSize();
         Point citeTextPos = new Point();
 
-        citeTextPos.X = aPos.X + aSize.Width + 200;
-        citeTextPos.Y = aPos.Y;
+        if (xCiteImage != null) {
+            Point aPos = xCiteImage.getPosition();
+            Size aSize = xCiteImage.getSize();
+            citeTextPos.X = aPos.X + aSize.Width + 200;
+            citeTextPos.Y = aPos.Y;
+        } else {
+            Point aPos = xOrigImage.getPosition();
+            Size aSize = xOrigImage.getSize();
+            citeTextPos.X = aPos.X;
+            citeTextPos.Y = aPos.Y + aSize.Height + 200;
+        }
         return citeTextPos;
     }
 
     // Assumes that the original image shape is supplied
-    public static Size calculateCitationImageSize(XShape xShape)
+    public static Size calculateCitationImageSize(XShape xOrigImage)
     {
-        Point aPos = xShape.getPosition();
-        Size aSize = xShape.getSize();
+        Point aPos = xOrigImage.getPosition();
+        Size aSize = xOrigImage.getSize();
         Size citationSize = new Size();
 
         citationSize.Width = 88 * 20; // Image is 88x31 pixels -- show it 20 times that size
@@ -237,15 +237,20 @@ public class DecompUtil {
         return citationSize;
     }
 
-    // Assumes that the citation image shape is supplied
-    public static Size calculateCitationTextSize(XShape xImage, XShape xCiteImage)
+    // Assumes that the original image shape is supplied, and perhaps the citation image shape
+    public static Size calculateCitationTextSize(XShape xOrigImage, XShape xCiteImage)
     {
-        Size imageSize = xImage.getSize();
-        Size citeSize = xCiteImage.getSize();
+        Size imageSize = xOrigImage.getSize();
         Size citeTextSize = new Size();
 
-        citeTextSize.Width = imageSize.Width - citeSize.Width - 200;
-        citeTextSize.Height = citeSize.Height;
+        if (xCiteImage != null) {
+            Size citeSize = xCiteImage.getSize();
+            citeTextSize.Width = imageSize.Width - citeSize.Width - 200;
+            citeTextSize.Height = citeSize.Height;
+        } else {
+            citeTextSize.Width = imageSize.Width;
+            citeTextSize.Height = 31 * 20;
+        }
         return citeTextSize;
     }
 
@@ -271,18 +276,6 @@ public class DecompUtil {
     {
 
         XPropertySet shapeProps = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, page);
-/*
-        if (shapeProps != null) {
-            try {
-                Object shapeURLObj = shapeProps.getPropertyValue("GraphicURL");
-                String shapeURL = shapeURLObj.toString();
-
-            //mylog.debug("The URL for this shape is '%s'", shapeURL);
-            } catch (Exception e) {
-                mylog.error("Unable to get GraphicURL property for context image: '%s'", e.getMessage());
-            }
-        }
- */
         String fname = String.format("%s/%s-%05d.%s", outputDir, "contextimage", p, "png");
 
         PropertyValue outProps[] = new PropertyValue[2];
@@ -322,15 +315,6 @@ public class DecompUtil {
     {
 
         XPropertySet shapeProps = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, shape);
-//        try {
-//            Object shapeURLObj = shapeProps.getPropertyValue("GraphicURL");
-//            String shapeURL = shapeURLObj.toString();
-//
-//            //mylog.debug("The URL for this shape is '%s'", shapeURL);
-//        } catch (Exception e) {
-//            mylog.debug("Unable to get GraphicURL property for object: '%s'", e.getMessage());
-//        }
-
         String fname = String.format("%s/%s-%05d-%03d.%s", outputDir, "image", p, s, "png");
 
         PropertyValue outProps[] = new PropertyValue[2];
@@ -345,7 +329,7 @@ public class DecompUtil {
         outProps[1].Name = "URL";
         outProps[1].Value = fileNameToOOoURL(fname);
 
-        mylog.debug("Exporting shape %d from page %d to file '%s'", s, p, fname);
+        mylog.debug("exportImage: Exporting shape %d from page %d to file '%s'", s, p, fname);
 
         try {
 
@@ -385,13 +369,8 @@ public class DecompUtil {
             XNameAccess xDocStorageNameAccess = (XNameAccess)
                     UnoRuntime.queryInterface(XNameAccess.class, xDocStorage);
 
-            String[] allNames = xDocStorageNameAccess.getElementNames();
-//            for (int i = 0; i < allNames.length; i++) {
-//                mylog.debug("The big list has name '%s'", allNames[i]);
-//            }
-
             if (!xDocStorageNameAccess.hasByName("Pictures")) {
-                mylog.debug("Found no \"Pictures\" in the document!!!");
+                mylog.warn("Found no \"Pictures\" in the document!!!");
                 return;
             }
 
@@ -403,7 +382,6 @@ public class DecompUtil {
             mylog.debug("There were a total of %d pictures found via DocStorageAccess", aNames.length);
             for (int i = 0; i < aNames.length; i++) {
                 //mylog.debug("Picture %d has name '%s'", i+1, aNames[i]);
-                //mylog.debug("Processing picture with name '%s'", aNames[i]);
                 if (aNames[i].contains(pictureURL)) {
                     Object oElement = xPicturesNameAccess.getByName(aNames[i]);
                     XStream xStream = (XStream) UnoRuntime.queryInterface(XStream.class, oElement);
@@ -411,6 +389,7 @@ public class DecompUtil {
                     XInputStream xInputStream = (XInputStream)
                             UnoRuntime.queryInterface(XInputStream.class, oInput);
 
+                    mylog.debug("exportImageByURL: Exporting image '%s' to '%s.%s'", pictureURL, outName, getExtension(aNames[i]));
                     xFileWriter.writeFile(outName + "." + getExtension(aNames[i]), xInputStream);
                     break;
                 }
@@ -508,7 +487,6 @@ public class DecompUtil {
                                       String newFNameUrl,
                                       String filterName)
     {
-        //String newFNameURL = fileNameToOOoURL(newFName);
         mylog.debug("Storing file using URL '%s'", newFNameUrl);
 
         XStorable xStorable = (XStorable) UnoRuntime.queryInterface(XStorable.class, xCompDoc);
@@ -518,16 +496,13 @@ public class DecompUtil {
         propertyValue[2].Value = Boolean.valueOf(true);
         propertyValue[0] = new com.sun.star.beans.PropertyValue();
         propertyValue[0].Name = "FilterName";
-        propertyValue[0].Value = filterName; // "MS Word 97"; // "MOOX"; //destinationFormats.getFilterName();
-//        propertyValue[2] = new PropertyValue();
-//        propertyValue[2].Value = "AsTemplate";
-//        propertyValue[2].Value = Boolean.valueOf(true);
+        propertyValue[0].Value = filterName;
+
         XOutputStreamToByteArrayAdapter outputStream = new XOutputStreamToByteArrayAdapter();
         propertyValue[1] = new com.sun.star.beans.PropertyValue();
         propertyValue[1].Name = "OutputStream";
         propertyValue[1].Value = outputStream;
         try {
-//          xStorable.storeAsURL(newFNameURL, propertyValue);
             xStorable.storeToURL(newFNameUrl, propertyValue);
         } catch (com.sun.star.io.IOException ex) {
             mylog.error("Storing document: " + ex.getMessage());
@@ -562,6 +537,7 @@ public class DecompUtil {
         String newName;
         OOoFormat nativeFormat;
 
+        // Get current file type and determine if we need to save it in OO format
         // If already in Native OO format, no need to continue
         if ((nativeFormat = getNativeFormat(origFormat)) == null) {
             return null;
@@ -570,13 +546,10 @@ public class DecompUtil {
             return null;
         }
 
-        // XXX Need proper code to generate a random name!!!
         newName = new String("/tmp/" + UUID.randomUUID().toString() + "." + nativeFormat.getFileExtension());
-//        newName = new String("/tmp/foobar_thisshouldberandom_" + "xyz123" + "." + nativeFormat.getFileExtension());
 
         // Save in OO format and return the name of the temporary file
         storeDocument(xContext, xMCF, xCompOrigDoc, fileNameToOOoURL(newName), nativeFormat.getFilterName());
-        // Get current file type and determine if we need to save it in OO format
 
         return newName;
     }

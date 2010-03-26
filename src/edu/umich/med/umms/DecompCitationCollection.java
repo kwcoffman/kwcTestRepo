@@ -8,7 +8,6 @@ package edu.umich.med.umms;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-//import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -49,39 +48,7 @@ public class DecompCitationCollection {
         entrylist.add(pe);
         return 0;
     }
-/*
-    public Iterator<DecompCitationCollectionEntry> startIteration()
-    {
-        if (entrylist.isEmpty())
-            return null;
 
-        // Sort the list
-        Collections.sort(entrylist, new Comparator<DecompCitationCollectionEntry>() {
-            public int compare(DecompCitationCollectionEntry a, DecompCitationCollectionEntry b) {
-                if (a.pageNum == b.pageNum) {
-                    return (b.imageNum - a.imageNum);
-                } else {
-                    return (b.pageNum - a.pageNum);
-                }
-            }
-        });
-
-        return entrylist.iterator();
-    }
-
-    public void endIteration(Iterator<DecompCitationCollectionEntry> it)
-    {
-        // Is there a need for this???
-    }
-
-    public DecompCitationCollectionEntry next(Iterator<DecompCitationCollectionEntry> it)
-    {
-        if (it.hasNext())
-            return it.next();
-        else
-            return null;
-    }
-*/
     public DecompCitationCollectionEntry[] getDecompCitationCollectionEntryArray() {
         if (entrylist.isEmpty())
             return null;

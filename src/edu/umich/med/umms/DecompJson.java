@@ -8,6 +8,8 @@ package edu.umich.med.umms;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.FileReader;
+import java.io.Writer;
+import java.io.FileWriter;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
@@ -20,14 +22,21 @@ public class DecompJson {
 
     private int id;
     private int version;
+    private String resultJsonFileName;
     private DecompFile[] decompFiles;
+    private int mainresultcode;
+    private String mainresultdetails;
 
     static public class DecompFile{
         private String inputFile;
         private DecompFileOp[] decompFileOps;
+        private int fileresultcode;
+        private String fileresultdetails;
 
         static public class DecompFileOp {
             private String operation;  //private DecompOperation operation;
+            private int opresultcode;
+            private String opresultdetails;
             private String outputFile;
             private String outputDir;
             private String repImageFile;
@@ -35,9 +44,15 @@ public class DecompJson {
             private String citationText;
             private int pageNum;
             private int imageNum;
+            private boolean excludeCustomShapes;
             //private String logLevel;
 
             public DecompFileOp() {
+            }
+
+            public void setOperationResult(int result, String details) {
+                this.opresultcode = result;
+                this.opresultdetails = details;
             }
         }
 
@@ -85,28 +100,17 @@ public class DecompJson {
         public int getImageNum(int i) {
             return this.decompFileOps[i].imageNum;
         }
-/*
-        public org.apache.log4j.Level getLogLevel(int i) {
-            if (this.decompFileOps[i].logLevel == null)
-                return null;
-
-            if (this.decompFileOps[i].logLevel.equalsIgnoreCase("debug"))
-                return org.apache.log4j.Level.DEBUG;
-            if (this.decompFileOps[i].logLevel.equalsIgnoreCase("all"))
-                return org.apache.log4j.Level.ALL;
-            if (this.decompFileOps[i].logLevel.equalsIgnoreCase("off"))
-                return org.apache.log4j.Level.OFF;
-            if (this.decompFileOps[i].logLevel.equalsIgnoreCase("info"))
-                return org.apache.log4j.Level.INFO;
-            if (this.decompFileOps[i].logLevel.equalsIgnoreCase("warn"))
-                return org.apache.log4j.Level.WARN;
-            if (this.decompFileOps[i].logLevel.equalsIgnoreCase("error"))
-                return org.apache.log4j.Level.ERROR;
-            if (this.decompFileOps[i].logLevel.equalsIgnoreCase("fatal"))
-                return org.apache.log4j.Level.FATAL;
-            return null;
+        public boolean getExcludeCustomShapes(int i) {
+            return this.decompFileOps[i].excludeCustomShapes;
         }
- */
+        public DecompFileOp getFileOp(int i) {
+            return this.decompFileOps[i];
+        }
+
+        public void setFileResult(int result, String details) {
+            this.fileresultcode = result;
+            this.fileresultdetails = details;
+        }
     }
 
 
@@ -126,6 +130,23 @@ public class DecompJson {
 
         reader.close();
     }
+
+    public int writeResults(String outfilename) {
+        Writer writer;
+        Gson gson = new GsonBuilder().create();
+        String outputJson;
+
+        try {
+            writer = new FileWriter(outfilename);
+            outputJson = gson.toJson(this, DecompJson.class);
+            writer.write(outputJson);
+            writer.close();
+        } catch (Exception e) {
+            return 1;
+        }
+        return 0;
+    }
+
     public int getVersion() {
         return this.version;
     }
@@ -138,8 +159,17 @@ public class DecompJson {
         return this.decompFiles.length;
     }
 
+    public String getResultJSONFileName() {
+        return this.resultJsonFileName;
+    }
+    
     public DecompFile getFile(int i)
     {
         return this.decompFiles[i];
+    }
+
+    public void setMainResult(int result, String details) {
+        this.mainresultcode = result;
+        this.mainresultdetails = details;
     }
 }

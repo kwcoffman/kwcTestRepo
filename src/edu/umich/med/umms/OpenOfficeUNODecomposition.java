@@ -72,6 +72,7 @@ public class OpenOfficeUNODecomposition {
             fp = new DecompFileProcessor(xContext, xDesktop, fileName);
         } catch (Exception e) {
             mylog.error("Error instantiating input file '%s' for processing: %s", fileName, e.getMessage());
+            return null;
             // System.exit(5);
         }
         fp.setLoggingLevel(myLogLevel);
@@ -99,35 +100,40 @@ public class OpenOfficeUNODecomposition {
         }
     }
 
-    private int processSingleFileOperation(DecompParameters dp, DecompFileProcessor fp)
+    private String processSingleFileOperation(DecompParameters dp, DecompFileProcessor fp)
     {
         return fp.doOperation(dp);
     }
 
-    public int processSingleFile(XComponentContext xContext, XDesktop xDesktop, DecompParameters dp) {
-        int ret = 1;
+    public String processSingleFile(XComponentContext xContext, XDesktop xDesktop, DecompParameters dp) {
+        String ret = null;
         DecompFileProcessor fp = getFileProcessor(xContext, xDesktop, dp.getInputFile());
-        if (fp != null) {
-            ret = processSingleFileOperation(dp, fp);
-            saveFile(dp, fp);
-            disposeFile(fp);
-        }
+        if (fp == null)
+            return new String("Error getting FileProcessor for file '" + dp.getInputFile() + "'");
+
+        ret = processSingleFileOperation(dp, fp);
+        saveFile(dp, fp);
+        disposeFile(fp);
+       
         return ret;
     }
 
-    public int processJsonFile(XComponentContext xContext, XDesktop xDesktop, DecompParameters dp)
+    public String processJsonFile(XComponentContext xContext, XDesktop xDesktop, DecompParameters dp)
     {
         DecompJson dj = null;
         int ret = 1;
+        String retstring = null;
+        String resultJsonFileName = dp.getJsonResultFile();
         try {
             dj = new DecompJson(dp.getJsonCommandFile());
-        } catch (IOException ex) {
-            mylog.error("IOException while processing input JSON from file '%s': %s", dp.getJsonCommandFile(), ex.getMessage());
-            return ret;
         } catch (java.lang.Exception e) {
-            mylog.error("Exception while processing input JSON from file '%s': %s", dp.getJsonCommandFile(), e.getMessage());
-            //e.printStackTrace();
-            return ret;
+            String msg = new String ("Exception while processing input JSON file " + dp.getJsonCommandFile() + ": " + e.getMessage());
+            if (resultJsonFileName != null) {
+                dj = new DecompJson();
+                dj.setMainResult(1, msg);
+                dj.writeResults(resultJsonFileName);
+            }
+            return msg;
         }
 
         // Now process the commands...
@@ -138,21 +144,22 @@ public class OpenOfficeUNODecomposition {
                     if (fp != null) {
                         for (int op = 0; op < dj.getFile(i).getNumOps(); op++) {
                             DecompParameters ldp = new DecompParameters(dj.getFile(i), op);
-                            ret = processSingleFileOperation(ldp, fp);
-                            if (ret != 0) {
-                                // indicate operation error
-                                continue;
-                            }
+                            retstring = processSingleFileOperation(ldp, fp);
+                            dj.getFile(i).getFileOp(op).setOperationResult((retstring == null) ? 0 : 1, retstring);
                         }
                         disposeFile(fp);
+                    } else {
+                        dj.getFile(i).setFileResult(1, "Error opening file" + dj.getFile(i).getInputFile());
                     }
                 }
                 break;
             default:
-                mylog.error("Recieved unsupported JSON version number: %d", dj.getVersion());
-                ret = 2;
+                retstring = new String("Recieved unsupported JSON version number: " + dj.getVersion());
+                dj.setMainResult(1, retstring);
         }
-        return ret;
+        if (resultJsonFileName != null)
+            dj.writeResults(resultJsonFileName);
+        return retstring;
     }
 
     public void defineOptions(Options opt)
@@ -176,6 +183,7 @@ public class OpenOfficeUNODecomposition {
         opt.addOption("te", "citetext", true, "Full citation text");
         opt.addOption("d", "output-dir", true, "Name of directory to receive output");
         opt.addOption("m", "commandlist", true, "List of commands");
+        opt.addOption("jr", "jsonresult", true, "Output JSON result file (ignored except when using json input)");
 
         opt.addOption("p", "pagenum", true, "Page number");
         opt.addOption("g", "imagenum", true, "Image number");
@@ -216,6 +224,9 @@ public class OpenOfficeUNODecomposition {
         if (cl.hasOption("j")) {
             dp.setOperation(DecompOperation.JSON);
             dp.setJsonCommandFile(cl.getOptionValue("j"));
+            if (cl.hasOption("jr")) {
+                dp.setJsonResultFile(cl.getOptionValue("jr"));
+            }
         }
 
         /* extract */

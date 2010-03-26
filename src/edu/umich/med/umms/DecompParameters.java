@@ -16,6 +16,7 @@ public class DecompParameters {
     private String citationImageFile;
     private String citationText;
     private String jsonCommandFile;
+    private String jsonResultFile;
     private int pageNum;
     private int imageNum;
 
@@ -53,6 +54,7 @@ public class DecompParameters {
         pageNum = df.getPageNum(opnum) - 1;
         imageNum = df.getImageNum(opnum) - 1;
         myLogLevel = org.apache.log4j.Level.WARN;
+        excludeCustomShapes = df.getExcludeCustomShapes(opnum);
 
         validationErrorMessage = null;
         indexesAdjusted = true;
@@ -89,6 +91,10 @@ public class DecompParameters {
     public void setJsonCommandFile(String f)
     {
         this.jsonCommandFile = f;
+    }
+    public void setJsonResultFile(String f)
+    {
+        this.jsonResultFile = f;
     }
     public void setPageNum(int p)
     {
@@ -172,6 +178,10 @@ public class DecompParameters {
     {
         return this.jsonCommandFile;
     }
+    public String getJsonResultFile()
+    {
+        return this.jsonResultFile;
+    }
     public int getPageNum()
     {
         return this.pageNum;
@@ -241,8 +251,8 @@ public class DecompParameters {
                 break;
 
             case CITE:
-                if (this.inputFile == null || this.citationText == null || this.citationImageFile == null || this.pageNum < 0 || this.imageNum < 0) {
-                    this.validationErrorMessage = new String("For citation, you must specify input, output, and citation image files, as well as the citation text and page and shape numbers.");
+                if (this.inputFile == null || this.citationText == null || this.pageNum < 0 || this.imageNum < 0) {
+                    this.validationErrorMessage = new String("For citation, you must specify input and output files, as well as the citation text and page and shape numbers.");
                     return false;
                 }
                 if (!validIndexes())
@@ -285,7 +295,7 @@ public class DecompParameters {
 
             case CITE:
                 if (this.outputFile == null) {
-                    this.validationErrorMessage = new String("For citation, you must specify input, output, and citation image files, as well as the citation text and page and shape numbers.");
+                    this.validationErrorMessage = new String("For citation, you must specify input and output files, as well as the citation text and page and shape numbers.");
                     return false;
                 }
                 break;
@@ -298,16 +308,18 @@ public class DecompParameters {
     {
         StringBuffer sb = new StringBuffer();
         sb.append("\n----- DecompParameters -----\n");
-        sb.append("operation:         " + this.operation.toString() + "\n");
-        sb.append("inputFile:         " + this.inputFile + "\n");
-        sb.append("outputFile:        " + this.outputFile + "\n");
-        sb.append("outputDir:         " + this.outputDir + "\n");
-        sb.append("repImageFile:      " + this.repImageFile + "\n");
-        sb.append("citationImageFile: " + this.citationImageFile + "\n");
-        sb.append("citationText:      " + this.citationText + "\n");
-        sb.append("jsonCommandFile:   " + this.jsonCommandFile + "\n");
-        sb.append("pageNum:           " + this.pageNum + "\n");
-        sb.append("imageNum:          " + this.imageNum + "\n");
+        sb.append("operation:           " + this.operation.toString() + "\n");
+        sb.append("inputFile:           " + this.inputFile + "\n");
+        sb.append("outputFile:          " + this.outputFile + "\n");
+        sb.append("outputDir:           " + this.outputDir + "\n");
+        sb.append("repImageFile:        " + this.repImageFile + "\n");
+        sb.append("citationImageFile:   " + this.citationImageFile + "\n");
+        sb.append("citationText:        " + this.citationText + "\n");
+        sb.append("jsonCommandFile:     " + this.jsonCommandFile + "\n");
+        sb.append("jsonResultFile:      " + this.jsonResultFile + "\n");
+        sb.append("pageNum:             " + this.pageNum + "\n");
+        sb.append("imageNum:            " + this.imageNum + "\n");
+        sb.append("excludeCustomShapes: " + this.excludeCustomShapes + "\n");
         return sb.toString();
     }
 }

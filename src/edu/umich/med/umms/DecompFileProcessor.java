@@ -4,7 +4,6 @@ import com.sun.star.frame.XDesktop;
 import com.sun.star.lang.XComponent;
 import com.sun.star.lang.XMultiComponentFactory;
 import com.sun.star.uno.XComponentContext;
-import java.util.Iterator;
 
 /**
  *
@@ -32,31 +31,6 @@ public class DecompFileProcessor {
     private DecompUtil myutil;
 
     private DecompCitationCollection citations;
-
-    public void setXComponentContext(XComponentContext xCtx)
-    {
-        xContext = xCtx;
-    }
-
-    public void setXDesktop(XDesktop xDt)
-    {
-        xDesktop = xDt;
-    }
-
-    public void setInputFile(String inputFile)
-    {
-        inputFileUrl = DecompUtil.fileNameToOOoURL(inputFile);
-    }
-
-    public void setOutputFile(String newOutputFile)
-    {
-        outputFileUrl = DecompUtil.fileNameToOOoURL(newOutputFile);
-    }
-
-    public void setOutputDir(String newOutputDir)
-    {
-        outputDir = newOutputDir;
-    }
 
     public DecompFileProcessor()
     {
@@ -88,12 +62,36 @@ public class DecompFileProcessor {
         citations = new DecompCitationCollection();
     }
 
+    public void setXComponentContext(XComponentContext xCtx)
+    {
+        xContext = xCtx;
+    }
+
+    public void setXDesktop(XDesktop xDt)
+    {
+        xDesktop = xDt;
+    }
+
+    public void setInputFile(String inputFile)
+    {
+        inputFileUrl = DecompUtil.fileNameToOOoURL(inputFile);
+    }
+
+    public void setOutputFile(String newOutputFile)
+    {
+        outputFileUrl = DecompUtil.fileNameToOOoURL(newOutputFile);
+    }
+
+    public void setOutputDir(String newOutputDir)
+    {
+        outputDir = newOutputDir;
+    }
+
     public void setLoggingLevel(org.apache.log4j.Level lvl)
     {
         myLogLevel = lvl;
         mylog.setLevel(myLogLevel);
     }
-
 
     public void printSupportedServices()
     {
@@ -103,6 +101,7 @@ public class DecompFileProcessor {
 
     private int replaceImage(String repImageFile, int pgnum, int imgnum) throws java.lang.Exception
     {
+        int retcode = -1;
         processFileFormat = (ooFileFormat == null) ? origFileFormat : ooFileFormat;
         
         int handler = processFileFormat.getHandlerType();
@@ -111,13 +110,13 @@ public class DecompFileProcessor {
             case 0:
                 DecompText dt = new DecompText();
                 dt.setLoggingLevel(myLogLevel);
-                dt.replaceImage(xContext, xMCF, xCompDoc, "xxxorigname",
+                retcode = dt.replaceImage(xContext, xMCF, xCompDoc, "xxxorigname",
                         DecompUtil.fileNameToOOoURL(repImageFile));
                 break;
             case 2:
                 DecompImpress di = new DecompImpress();
                 di.setLoggingLevel(myLogLevel);
-                di.replaceImage(xContext, xMCF, xCompDoc, "origname",
+                retcode = di.replaceImage(xContext, xMCF, xCompDoc, "origname",
                         DecompUtil.fileNameToOOoURL(repImageFile), pgnum, imgnum);
                 break;
             case 1: // Spreadsheets are not currently supported
@@ -125,11 +124,12 @@ public class DecompFileProcessor {
                 java.lang.Exception e = new java.lang.Exception("File " + inputFileUrl + " is an unsupported file format");
                 throw e;
         }
-        return 0;
+        return retcode;
     }
 
     private int citeImage(String citationText, String citeImageFile, int pgnum, int imgnum) throws java.lang.Exception
     {
+        int retcode = -1;
         processFileFormat = (ooFileFormat == null) ? origFileFormat : ooFileFormat;
 
         int handler = processFileFormat.getHandlerType();
@@ -138,14 +138,14 @@ public class DecompFileProcessor {
             case 0:
                 DecompText dt = new DecompText();
                 dt.setLoggingLevel(myLogLevel);
-                dt.insertImageCitation(xContext, xMCF, xCompDoc, citationText,
+                retcode = dt.insertImageCitation(xContext, xMCF, xCompDoc, citationText,
                         DecompUtil.fileNameToOOoURL(citeImageFile), pgnum, imgnum);
                 break;
             case 2:
                 DecompImpress di = new DecompImpress();
                 di.setLoggingLevel(myLogLevel);
-                di.insertImageCitation(xContext, xMCF, xCompDoc, citationText,
-                        DecompUtil.fileNameToOOoURL(citeImageFile), pgnum, imgnum);
+                retcode = di.insertImageCitation(xContext, xMCF, xCompDoc, citationText,
+                        /*DecompUtil.fileNameToOOoURL(citeImageFile),*/ pgnum, imgnum);
                 citations.addCitationEntry(citationText, pgnum, imgnum);
                 break;
             case 1:
@@ -153,7 +153,7 @@ public class DecompFileProcessor {
                 java.lang.Exception e = new java.lang.Exception("File " + inputFileUrl + " is an unsupported file format");
                 throw e;
         }
-        return 0;
+        return retcode;
     }
 
     private int extractImages(String outputDirectory, boolean excludeCustomShapes) throws java.lang.Exception
@@ -165,6 +165,8 @@ public class DecompFileProcessor {
 
     private int extractImages(boolean excludeCustomShapes) throws java.lang.Exception
     {
+        int retcode = -1;
+
         if (outputDir == null) {
             java.lang.Exception e = new java.lang.Exception("No output directory specified!");
             throw e;
@@ -192,12 +194,12 @@ public class DecompFileProcessor {
             case 0:
                 DecompText dt = new DecompText();
                 dt.setLoggingLevel(myLogLevel);
-                dt.extractImages(xContext, xMCF, xCompDoc, outputDir, excludeCustomShapes);
+                retcode = dt.extractImages(xContext, xMCF, xCompDoc, outputDir, excludeCustomShapes);
                 break;
             case 2:
                 DecompImpress di = new DecompImpress();
                 di.setLoggingLevel(myLogLevel);
-                di.extractImages(xContext, xMCF, xCompDoc, outputDir, excludeCustomShapes);
+                retcode = di.extractImages(xContext, xMCF, xCompDoc, outputDir, excludeCustomShapes);
                 break;
             case 1:
             default:
@@ -210,13 +212,13 @@ public class DecompFileProcessor {
             xCompDoc.dispose();
             DecompUtil.removeTemporaryDocument(newName);
         }
-        return 0;
+        return retcode;
     }
 
     /*
      * This is only used for PowerPoint files
      */
-    private void addCitationPages()
+    private void addCitationPages(int pageOffset)
     {
         int i, j;
         DecompCitationCollection.DecompCitationCollectionEntry cpe;
@@ -229,26 +231,30 @@ public class DecompFileProcessor {
 
         di = new DecompImpress();
         di.setLoggingLevel(myLogLevel);
-        di.addCitationPages(xCompDoc, cpeArray);
+        di.addCitationPages(xCompDoc, cpeArray, pageOffset);
 
     }
 
     /*
      * This is only used for PowerPoint files
      */
-    public void addFrontMatter(String originFile)
+    public int addFrontMatter(String originFile)
     {
         DecompImpress di = new DecompImpress();
         di.setLoggingLevel(myLogLevel);
-        di.insertFrontBoilerplate(xContext, xDesktop, xMCF, xCompDoc, originFile);
+        return di.insertFrontBoilerplate(xContext, xDesktop, xMCF, xCompDoc, originFile);
     }
     
     private int save() throws java.lang.Exception
     {
         // Do some extra work for PowerPoint files
         if (origFileFormat.getHandlerType() == 2) {
-            addCitationPages();
-            addFrontMatter("/Users/kwc/Downloads/RecompBoilerplate.ppt");  // XXX This needs to be a parameter!!
+            int addedFrontPages;
+
+            addedFrontPages = addFrontMatter("/Users/kwc/Downloads/RecompBoilerplate.ppt");  // XXX This needs to be a parameter!!
+            if (addedFrontPages < 0)
+                addedFrontPages = 0;
+            addCitationPages(addedFrontPages);
         }
 
         if (outputFileUrl != null && outputFileUrl.compareTo("") != 0) {
@@ -272,40 +278,48 @@ public class DecompFileProcessor {
     }
 
 
-    public int doOperation(DecompParameters dp)
+    public String doOperation(DecompParameters dp)
     {
-        int ret = 1;
+        String ret = null;
+        int retcode = -1;
         if (!dp.ValidSingleOp())
-            return 7;
+            return logOperationInformation(dp, "Invalid parameters", null);
         try {
             switch (dp.getOperation()) {
                 case EXTRACT:
-                    ret = this.extractImages(dp.getOutputDir(), dp.getExcludeCustomShapes());
+                    retcode = this.extractImages(dp.getOutputDir(), dp.getExcludeCustomShapes());
                     break;
                 case REPLACE:
-                    ret = this.replaceImage(dp.getRepImageFile(), dp.getPageNum(), dp.getImageNum());
+                    retcode = this.replaceImage(dp.getRepImageFile(), dp.getPageNum(), dp.getImageNum());
                     break;
                 case CITE:
-                    ret = this.citeImage(dp.getCitationText(), dp.getCitationImageFile(), dp.getPageNum(), dp.getImageNum());
+                    retcode = this.citeImage(dp.getCitationText(), dp.getCitationImageFile(), dp.getPageNum(), dp.getImageNum());
                     break;
                 case SAVE:
-                    ret = this.saveTo(dp.getOutputFile());
+                    retcode = this.saveTo(dp.getOutputFile());
                     break;
             }
-//        } catch (com.sun.star.lang.DisposedException de) {
-//            logOperationInformation(dp, de.getMessage());
-//            ret = 2;
         } catch (java.lang.Exception e) {
-            logOperationInformation(dp, e.getMessage());
-            ret = 2;
-        } finally {
-            return ret;
+            return logOperationInformation(dp, "Caught Exception", e.getMessage());
+        }
+        if (retcode == 0) {
+            return null;
+        } else {
+            return logOperationInformation(dp, "Operation Failed", null);
         }
     }
 
-    private void logOperationInformation(DecompParameters dp, String exceptionMsg)
+    private String logOperationInformation(DecompParameters dp, String errMsg, String exceptionMsg)
     {
-        mylog.error("Error processing operation on file '%s': %s", dp.getInputFile(), exceptionMsg);
-        mylog.error(dp.toString());
+        StringBuilder msg = new StringBuilder();
+
+        msg.append(errMsg);
+        if (exceptionMsg != null) {
+            msg.append(" : ");
+            msg.append(exceptionMsg);
+        }
+        msg.append("\n");
+        msg.append(dp.toString());
+        return msg.toString();
     }
 }

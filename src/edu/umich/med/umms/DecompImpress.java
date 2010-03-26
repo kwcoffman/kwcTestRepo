@@ -14,9 +14,6 @@ import com.sun.star.beans.PropertyValue;
 import com.sun.star.beans.PropertyVetoException;
 import com.sun.star.beans.XPropertySet;
 import com.sun.star.beans.UnknownPropertyException;
-import com.sun.star.container.NoSuchElementException;
-import com.sun.star.container.XNameAccess;
-import com.sun.star.datatransfer.XTransferable;
 
 import com.sun.star.drawing.XDrawPagesSupplier;
 import com.sun.star.drawing.XDrawPages;
@@ -29,9 +26,7 @@ import com.sun.star.frame.XDesktop;
 import com.sun.star.frame.XDispatchHelper;
 import com.sun.star.frame.XDispatchProvider;
 import com.sun.star.frame.XFrame;
-import com.sun.star.frame.XFrameActionListener;
 import com.sun.star.frame.XModel;
-import com.sun.star.lang.IllegalArgumentException;
 import com.sun.star.lang.XMultiComponentFactory;
 import com.sun.star.lang.XComponent;
 import com.sun.star.lang.IndexOutOfBoundsException;
@@ -42,7 +37,6 @@ import com.sun.star.graphic.XGraphicProvider;
 
 import com.sun.star.lib.uno.adapter.ByteArrayToXInputStreamAdapter;
 import com.sun.star.style.ParagraphAdjust;
-import com.sun.star.style.XStyleFamiliesSupplier;
 import com.sun.star.text.ControlCharacter;
 import com.sun.star.text.XText;
 import com.sun.star.text.XTextCursor;
@@ -51,8 +45,8 @@ import com.sun.star.text.XTextRange;
 import com.sun.star.uno.Exception;
 import com.sun.star.uno.UnoRuntime;
 import com.sun.star.uno.XComponentContext;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 
 
 /**
@@ -81,7 +75,7 @@ public class DecompImpress {
         mylog.setLevel(myLogLevel);
     }
 
-    public void extractImages(XComponentContext xContext,
+    public int extractImages(XComponentContext xContext,
                               XMultiComponentFactory xMCF,
                               XComponent xCompDoc,
                               String outputDir,
@@ -92,7 +86,7 @@ public class DecompImpress {
                 (XDrawPagesSupplier) UnoRuntime.queryInterface(XDrawPagesSupplier.class, xCompDoc);
         if (xDrawPagesSuppl == null) {
             mylog.error("Cannot get XDrawPagesSupplier interface for Presentation Document???");
-            System.exit(8);
+            return 8;
         }
         DecompUtil du = new DecompUtil();
         du.setLoggingLevel(myLogLevel);
@@ -112,7 +106,7 @@ public class DecompImpress {
                 if (currPage == null) {
                     mylog.error("Failed to get currPage at page %d!", p+1);
                     xCompDoc.dispose();
-                    System.exit(22);
+                    return 22;
                 }
                 mylog.debug("=== Working with page %d ===", p+1);
                 du.exportContextImage(xContext, xMCF, currPage, outputDir, p+1);
@@ -127,7 +121,7 @@ public class DecompImpress {
                     if (currShape == null) {
                         mylog.error("Failed to get currShape (%d) from page %d!", s+1, p+1);
                         xCompDoc.dispose();
-                        System.exit(33);
+                        return 33;
                     }
                     String currType = currShape.getShapeType();
                     com.sun.star.awt.Size shapeSize = currShape.getSize();
@@ -138,7 +132,7 @@ public class DecompImpress {
 
                     /* Note that we specifically ignore TitleTextShape, OutlinerShape, and LineShape */
                     if (currType.equalsIgnoreCase("com.sun.star.drawing.GraphicObjectShape")) {
-                        mylog.debug("Handling GraphicObjectShape (%d) on page %d\n", s+1, p+1);
+                        mylog.debug("Handling GraphicObjectShape (%d) on page %d", s+1, p+1);
 //                        exportImage(xContext, xMCF, currShape, outputDir, p+1, s+1);
                         XPropertySet textProps = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, currShape);
                         String pictureURL = textProps.getPropertyValue("GraphicURL").toString();
@@ -146,31 +140,37 @@ public class DecompImpress {
                         String outName = DecompUtil.constructBaseImageName(outputDir, p+1, s+1);
                         du.extractImageByURL(xContext, xMCF, xCompDoc, pictureURL, outName);
                     } else if (currType.equalsIgnoreCase("com.sun.star.drawing.TableShape")) {
-                        mylog.debug("Handling TableShape (%d) on page %d\n", s+1, p+1);
+                        mylog.debug("Handling TableShape (%d) on page %d", s+1, p+1);
                         du.exportImage(xContext, xMCF, currShape, outputDir, p+1, s+1);
                     } else if (currType.equalsIgnoreCase("com.sun.star.drawing.GroupShape")) {
-                        mylog.debug("Handling GroupShape (%d) on page %d\n", s+1, p+1);
+                        mylog.debug("Handling GroupShape (%d) on page %d", s+1, p+1);
                         du.exportImage(xContext, xMCF, currShape, outputDir, p + 1, s + 1);
                     } else if (currType.equalsIgnoreCase("com.sun.star.drawing.CustomShape")) {
-                        if (!excludeCustomShapes) {
-                            mylog.debug("Handling CustomShape (%d) on page %d\n", s+1, p+1);
+                        if (excludeCustomShapes) {
+                            mylog.debug("SKIPPING CustomShape (%d) on page %d", s+1, p+1);
+                        } else {
+                            mylog.debug("Handling CustomShape (%d) on page %d", s+1, p+1);
                             du.exportImage(xContext, xMCF, currShape, outputDir, p+1, s+1);
                         }
                     } else {
-                        mylog.debug("SKIPPING unhandled shape type '%s' (%d) on page %d\n", currType, s+1, p+1);
+                        mylog.debug("SKIPPING unhandled shape type '%s' (%d) on page %d", currType, s+1, p+1);
                     }
                 }
             }
         } catch (IndexOutOfBoundsException ex) {
             mylog.error("extractImages: Caught IndexOutOfBoundsException!");
+            return 40;
             //Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
         } catch (WrappedTargetException ex) {
             mylog.error("extractImages: Caught WrappedTargetException!");
+            return 41;
             //Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
         } catch (UnknownPropertyException ex) {
             mylog.error("extractImages: Caught UnknownPropertyException!");
+            return 42;
             //Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
         }
+        return 0;
     }
 
     /*
@@ -271,7 +271,7 @@ public class DecompImpress {
 
             XGraphic xGraphic = xGraphicProvider.queryGraphic(sourceProps);
 
-            XPropertySet origProps = DecompUtil.duplicateObjectPropertySet(currShape);
+            XPropertySet origProps = DecompUtil.getObjectPropertySet(currShape);
 
             origProps.setPropertyValue("Graphic", xGraphic);
 
@@ -283,6 +283,18 @@ public class DecompImpress {
         return 0;
     }
 
+    /**
+     * Utility function to add text to the full citation page(s)
+     *
+     * @param shape
+     * @param text
+     * @param fontname
+     * @param fontsize
+     * @param prependParagraph
+     * @param centerParagraph
+     * @param doubleSpaced
+     * @return
+     */
     private int insertCitationPageText(XShape shape, String text, String fontname, int fontsize,
             boolean prependParagraph, boolean centerParagraph, boolean doubleSpaced)
     {
@@ -310,6 +322,20 @@ public class DecompImpress {
         return 0;
     }
 
+    /**
+     * Adds full citation text to the citation page
+     *
+     * @param xCompDoc
+     * @param cShape
+     * @param p
+     * @param s
+     * @param i
+     * @param citationString
+     * @param citationLicense
+     * @param citationLicenseBadgeURL
+     * @param newParagraph
+     * @return
+     */
     private int insertFullCitation(XComponent xCompDoc,
                                    XShape cShape,
                                    int p,     // Cited image page number
@@ -342,8 +368,14 @@ public class DecompImpress {
     }
 
 
-   private XShape addCitationPage(XComponent xCompDoc)
-   {
+    /**
+     * Add a new page to the presentation to contain full citation information
+     * 
+     * @param xCompDoc
+     * @return
+     */
+    private XShape addCitationPage(XComponent xCompDoc)
+    {
 
         XDrawPage newPage = null;
         XShape citeShape = null;
@@ -367,102 +399,233 @@ public class DecompImpress {
         } finally {
             return citeShape;
         }
-   }
+    }
 
-   public int addCitationPages(XComponent xCompDoc, DecompCitationCollection.DecompCitationCollectionEntry[] entries)
-   {
-       int i;
-       int perPage = 15;
-       XShape cShape = null;
-       XDrawPage cPage = null;
-       DecompCitationCollection.DecompCitationCollectionEntry cpe;
+    /**
+     * Main routine to add one or more citation pages to the end of the presentation
+     * 
+     * @param xCompDoc
+     * @param entries
+     * @param pageOffset
+     * @return
+     */
+    public int addCitationPages(XComponent xCompDoc, DecompCitationCollection.DecompCitationCollectionEntry[] entries, int pageOffset)
+    {
+        int i;
+        int perPage = 15;
+        XShape cShape = null;
+        XDrawPage cPage = null;
+        DecompCitationCollection.DecompCitationCollectionEntry cpe;
 
-       for (i = 0; i < entries.length; i++)
-       {
+        for (i = 0; i < entries.length; i++)
+        {
             if (i % perPage == 0)
                 cShape = addCitationPage(xCompDoc);
 
             cpe = entries[i];
             boolean newParagraph = (i % perPage != 0);
-            insertFullCitation(xCompDoc, cShape, cpe.pageNum, cpe.imageNum, (i % perPage), cpe.fullCitation, null, null, newParagraph);
-       }
-       return 0;
-   }
-   
-   /* XXX  To be completed
-      http://www.oooforum.org/forum/viewtopic.phtml?t=45734
-    */
+            insertFullCitation(xCompDoc, cShape, (cpe.pageNum + pageOffset + 1), cpe.imageNum, (i % perPage), cpe.fullCitation, null, null, newParagraph);
+        }
+        return 0;
+    }
+
+    /**
+     * Utility function to parse the full citation string
+     * Returns either the short citation to be included in the
+     * main presentation with the image, or the License URL
+     * portion.
+     * <p>
+     * If the full citation string cannot be parsed, the full
+     * string is returned for the short citation, and nothing
+     * is returned for the License URL.
+     *
+     * @param fullCitation
+     * @param whichpart
+     * @return
+     */    private String parseFullCitation(String fullCitation, int whichpart)
+    {
+        final String REGEXP = "(.*) (http://.*), (.*) (http://.*)";
+        Pattern fullPattern = Pattern.compile(REGEXP);
+        Matcher fullMatcher = fullPattern.matcher(fullCitation);
+        boolean fullFound = false;
+        int fullGroups;
+
+        fullFound = fullMatcher.find();
+        if(!fullFound) {
+            switch (whichpart) {
+                case 1:  // Short citation
+                    return new String(fullCitation);
+                case 2:  // License URL
+                    return null;
+                default:
+                    return null;
+            }
+        }
+
+        fullGroups = fullMatcher.groupCount();
+        if (fullGroups != 4)
+            return null;
+
+        switch (whichpart) {
+            case 1:  // Short citation
+                return new String(fullMatcher.group(1) + " " + fullMatcher.group(3));
+            case 2:  // License URL
+                return fullMatcher.group(4);
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * Given a full citation string, return a short string
+     * which can be placed in the presentation with the image
+     *
+     * @param fullCitation
+     * @return
+     */private String getShortCitation(String fullCitation)
+    {
+        return parseFullCitation(fullCitation, 1);
+    }
+
+    /**
+     * Given a full citation string, return the License URL portion
+     *
+     * @param fullCitation
+     * @return
+     */
+    private String getLicenseURL(String fullCitation)
+    {
+        return parseFullCitation(fullCitation, 2);
+    }
+
+
+    /**
+     * Assuming a creativecommons license URL, return the URL to the "badge" icon
+     *
+     * @param licenseURL
+     * @return
+     */private String getBadgeURLfromLicenseURL(String licenseURL)
+    {
+        final String URLEXP = "http://.*\\.?creativecommons.org/licenses/([^/]*)/([^/]*)/?";
+        boolean urlFound = false;
+        int urlGroups;
+
+        // Transform the License URL to find the license image "badge" URL
+        Pattern urlPattern = Pattern.compile(URLEXP);
+        Matcher urlMatcher = urlPattern.matcher(licenseURL);
+
+        urlFound = urlMatcher.find();
+        if (!urlFound) {
+            //System.out.printf("No URL match found\n");
+            return null;
+        } else {
+            urlGroups = urlMatcher.groupCount();
+            for (int i = 0; i <= urlGroups; i++) {
+                //System.out.printf("URL group %d is \"%s\"\n", i, urlMatcher.group(i));
+            }
+            if (urlGroups != 2) {
+                //System.out.printf("The License URL is not creativecommons...\n");
+                return null;
+            } else {
+                String badgeURL = String.format("http://i.creativecommons.org/l/%s/%s/88x31.png", urlMatcher.group(1), urlMatcher.group(2));
+                //System.out.printf("The Badge URL is \"%s\"\n\n", badgeURL);
+                return badgeURL;
+            }
+        }
+    }
+
+    /**
+     * Adds citation information for an image to the slide.
+     * Originally from http://www.oooforum.org/forum/viewtopic.phtml?t=45734
+     *
+     * @param xContext
+     * @param xMCF
+     * @param xCompDoc
+     * @param citationText
+     * @param citationURL
+     * @param p
+     * @param s
+     * @return
+     */
     public int insertImageCitation(XComponentContext xContext,
                                    XMultiComponentFactory xMCF,
                                    XComponent xCompDoc,
                                    String citationText,
-                                   String citationURL,
+                                   //String citationURL,
                                    int p,
                                    int s)
     {
         try {
 
+            String shortCitation = null, licenseURL = null, badgeURL = null;
+            XShapes xShapes;
+            XShape xCIShape = null, xOrigImage = null;
+
             XDrawPage drawPage = getDrawPageByIndex(xCompDoc, p);
             if (drawPage == null)
                 return 1;
-
             //mylog.debug("drawPage.getCount says there are %d objects\n", drawPage.getCount());
-
-            XShapes xShapes = (XShapes) UnoRuntime.queryInterface(XShapes.class, drawPage);
-
-            // Use the original image location and size to determine the location
-            // and size (at least the width?) of the citation information
-
+            xShapes = (XShapes) UnoRuntime.queryInterface(XShapes.class, drawPage);
             Object oOrigImage = xShapes.getByIndex(s);
             XPropertySet xOrigPropSet = (XPropertySet)
                     UnoRuntime.queryInterface(XPropertySet.class, oOrigImage);
-//            DecompUtil.printObjectProperties(oOrigImage);
-            XShape xOrigImage = (XShape) UnoRuntime.queryInterface(XShape.class, oOrigImage);
-//            DecompUtil.printShapeProperties(xOrigImage);
+            xOrigImage = (XShape) UnoRuntime.queryInterface(XShape.class, oOrigImage);
 
-            // Add citation image
-            String convertedURL = DecompUtil.getInternalURL(xCompDoc, citationURL, citationURL);
+            shortCitation = getShortCitation(citationText);
+            licenseURL = getLicenseURL(citationText);
+            if (licenseURL != null)
+                badgeURL = getBadgeURLfromLicenseURL(licenseURL);
 
-            // Calculate citation image location using original image properties
-            Point citeImagePos = DecompUtil.calculateCitationImagePosition(xOrigImage);
-            Size citeImageSize = DecompUtil.calculateCitationImageSize(xOrigImage);
+            if (badgeURL != null) {
+                // Add citation image
+                String convertedURL = DecompUtil.getInternalURL(xCompDoc, badgeURL, badgeURL);
 
-            XShape xCIShape = DecompUtil.createShape(xCompDoc, citeImagePos, citeImageSize,
-                                    "com.sun.star.drawing.GraphicObjectShape");
-            XPropertySet xImageProps = (XPropertySet)
-                    UnoRuntime.queryInterface(XPropertySet.class, xCIShape);
-            xImageProps.setPropertyValue("GraphicURL", convertedURL);
-            xShapes.add(xCIShape);
-            mylog.debug("drawPage.getCount nows says there are %d objects\n", drawPage.getCount());
+                // Calculate citation image location using original image properties
+                Point citeImagePos = DecompUtil.calculateCitationImagePosition(xOrigImage);
+                Size citeImageSize = DecompUtil.calculateCitationImageSize(xOrigImage);
 
-            // Caclulate citation text location using citation image location
-            Point citeTextPos = DecompUtil.calculateCitationTextPosition(xCIShape);
-            Size citeTextSize = DecompUtil.calculateCitationTextSize(xOrigImage, xCIShape);
+                xCIShape = DecompUtil.createShape(xCompDoc, citeImagePos, citeImageSize,
+                                        "com.sun.star.drawing.GraphicObjectShape");
+                XPropertySet xImageProps = (XPropertySet)
+                        UnoRuntime.queryInterface(XPropertySet.class, xCIShape);
+                xImageProps.setPropertyValue("GraphicURL", convertedURL);
+                xShapes.add(xCIShape);
+                //mylog.debug("drawPage.getCount nows says there are %d objects\n", drawPage.getCount());
+            }
+ 
+            if (shortCitation != null) {
+                // Caclulate citation text location using citation image location
+                Point citeTextPos = DecompUtil.calculateCitationTextPosition(xOrigImage, xCIShape);
+                Size citeTextSize = DecompUtil.calculateCitationTextSize(xOrigImage, xCIShape);
 
-            // Add citation text
-            XShape xCTShape = DecompUtil.createShape(xCompDoc, citeTextPos, citeTextSize,
-                                    "com.sun.star.drawing.TextShape");  // There is also a TextShape?
-            xShapes.add(xCTShape);
+                // Add citation text
+                XShape xCTShape = DecompUtil.createShape(xCompDoc, citeTextPos, citeTextSize,
+                                        "com.sun.star.drawing.TextShape");  // There is also a TextShape?
+                xShapes.add(xCTShape);
 
-            XText xText = (XText) UnoRuntime.queryInterface(XText.class, xCTShape);
-            XTextCursor xTextCursor = xText.createTextCursor();
-            XPropertySet xTxtProps = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, xTextCursor);
+                XText xText = (XText) UnoRuntime.queryInterface(XText.class, xCTShape);
+                XTextCursor xTextCursor = xText.createTextCursor();
+                XPropertySet xTxtProps = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, xTextCursor);
 
-            xTxtProps.setPropertyValue("CharFontName", "Arial");
-            xTxtProps.setPropertyValue("CharHeight", 8);
-//            xTxtProps.setPropertyValue("CharColor", new Integer(0xffffff));
-            xText.setString(citationText);
-            //xTxtProps.setPropertyValue("HyperLinkURL", "http://open.umich.edu"); // XXX Doesn't work for impress documents.
-            //xText.setString("CC-BY");
+                xTxtProps.setPropertyValue("CharFontName", "Arial");
+                xTxtProps.setPropertyValue("CharHeight", 8);
+                xText.setString(shortCitation);
+            }
 
         } catch (java.lang.Exception ex) {
             mylog.error("insertImageCitation: Caught exception: " + ex.getMessage());
-//            Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
             return 1;
         }
         return 0;
     }
 
+    /**
+     * Copy the background properties from the srcPage to the destPage
+     * If src has no specific background, then the destination background is unchanged
+     *
+     * @param destPage
+     * @param srcPage
+     */
     private void copyBackground(XDrawPage destPage, XDrawPage srcPage)
     {
         XPropertySet srcPageProps = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, srcPage);
@@ -493,21 +656,27 @@ public class DecompImpress {
         XDrawPagesSupplier srcPagesSuppl;
         PropertyValue props[] = new PropertyValue[0];
 
+        // Duplicate the original first page since we can't insert before it...
+        XDrawPage destDP = getDrawPageByIndex(destDoc, 0);
+        XDrawPageDuplicator xdup = UnoRuntime.queryInterface(XDrawPageDuplicator.class, destDoc);
+        xdup.duplicate(destDP);
+
+        // Query for the XDrawPagesSupplier interfaces
         try {
             srcDoc = DecompUtil.openFileForProcessing(xDesktop, srcFileUrl);
         } catch (java.lang.Exception ex) {
             mylog.error("insertFrontBoilerplate: Exception while opening source file: " + fileName);
-            return 1;
+            return -1;
         }
 
-        // Query for the XDrawPagesSupplier interfaces
         srcPagesSuppl =
                 (XDrawPagesSupplier) UnoRuntime.queryInterface(XDrawPagesSupplier.class, srcDoc);
         if (srcPagesSuppl == null) {
             mylog.error("Cannot get XDrawPagesSupplier interface for source Presentation Document???");
             srcDoc.dispose();
-            return 1;
+            return -1;
         }
+
         XDrawPages srcDrawPages = srcPagesSuppl.getDrawPages();
         int srcCount = srcDrawPages.getCount();
 
@@ -528,7 +697,14 @@ public class DecompImpress {
 
         }
         srcDoc.dispose();
-        return 0;
+
+        // Now remove the original first page
+        destPagesSuppl =
+                (XDrawPagesSupplier) UnoRuntime.queryInterface(XDrawPagesSupplier.class, destDoc);
+        XDrawPages destPages = destPagesSuppl.getDrawPages();
+        destPages.remove(destDP);
+
+        return srcCount;
     }
 
     // Based on http://www.oooforum.org/forum/viewtopic.phtml?t=48271
@@ -634,9 +810,4 @@ public class DecompImpress {
         }
     }
     
-    private int insertLicenseButton()
-    {
-        return 0;
-    }
-
 }
