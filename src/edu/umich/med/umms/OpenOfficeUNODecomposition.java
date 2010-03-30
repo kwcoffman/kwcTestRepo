@@ -206,6 +206,7 @@ public class OpenOfficeUNODecomposition {
             if (!dp.setLoggingLevel(levelDesired)) {
                 mylog.warn("Loglevel " + levelDesired + " is not a valid choice.  Ignored.");
             }
+            myLogLevel = dp.getLoggingLevel();
         }
 
         if (cl.hasOption("h")) {
