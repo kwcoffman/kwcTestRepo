@@ -88,7 +88,7 @@ public class DecompText {
                                      XMultiComponentFactory xMCF,
                                      XComponent xCompDoc,
                                      String outputDir,
-                                     boolean excludeCustomShapes)
+                                     boolean includeCustomShapes)
     {
         DecompUtil du = new DecompUtil();
         du.setLoggingLevel(myLogLevel);

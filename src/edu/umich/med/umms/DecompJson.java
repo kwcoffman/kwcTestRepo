@@ -44,7 +44,7 @@ public class DecompJson {
             private String citationText;
             private int pageNum;
             private int imageNum;
-            private boolean excludeCustomShapes;
+            private boolean includeCustomShapes;
             //private String logLevel;
 
             public DecompFileOp() {
@@ -100,8 +100,8 @@ public class DecompJson {
         public int getImageNum(int i) {
             return this.decompFileOps[i].imageNum;
         }
-        public boolean getExcludeCustomShapes(int i) {
-            return this.decompFileOps[i].excludeCustomShapes;
+        public boolean getIncludeCustomShapes(int i) {
+            return this.decompFileOps[i].includeCustomShapes;
         }
         public DecompFileOp getFileOp(int i) {
             return this.decompFileOps[i];

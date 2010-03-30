@@ -79,7 +79,7 @@ public class DecompImpress {
                               XMultiComponentFactory xMCF,
                               XComponent xCompDoc,
                               String outputDir,
-                              boolean excludeCustomShapes)
+                              boolean includeCustomShapes)
     {
         // Query for the XDrawPagesSupplier interface
         XDrawPagesSupplier xDrawPagesSuppl =
@@ -128,15 +128,17 @@ public class DecompImpress {
                     com.sun.star.awt.Point shapePoint = currShape.getPosition();
                     mylog.debug("--- Working with shape %d (At %d:%d, size %dx%d)\ttype: %s---", s + 1, shapePoint.X, shapePoint.Y, shapeSize.Width, shapeSize.Height, currType);
 
-                    //printShapeProperties(currShape);
+                    // du.printShapeProperties(currShape);
 
                     /* Note that we specifically ignore TitleTextShape, OutlinerShape, and LineShape */
                     if (currType.equalsIgnoreCase("com.sun.star.drawing.GraphicObjectShape")) {
                         mylog.debug("Handling GraphicObjectShape (%d) on page %d", s+1, p+1);
 //                        exportImage(xContext, xMCF, currShape, outputDir, p+1, s+1);
-                        XPropertySet textProps = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, currShape);
-                        String pictureURL = textProps.getPropertyValue("GraphicURL").toString();
-                        pictureURL = pictureURL.substring(27);  // Chop off the leading "vnd.sun.star.GraphicObject:"
+                        XPropertySet shapeProps = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, currShape);
+//                        String pictureURL = shapeProps.getPropertyValue("GraphicURL").toString();  // ?? Original code (that once worked) used this ??
+                        String pictureURL = shapeProps.getPropertyValue("GraphicStreamURL").toString();
+//                        pictureURL = pictureURL.substring(27);  // Chop off the leading "vnd.sun.star.GraphicObject:"
+                        pictureURL = pictureURL.substring(30);  // Chop off the leading   "vnd.sun.star.Package:Pictures/"
                         String outName = DecompUtil.constructBaseImageName(outputDir, p+1, s+1);
                         du.extractImageByURL(xContext, xMCF, xCompDoc, pictureURL, outName);
                     } else if (currType.equalsIgnoreCase("com.sun.star.drawing.TableShape")) {
@@ -146,12 +148,11 @@ public class DecompImpress {
                         mylog.debug("Handling GroupShape (%d) on page %d", s+1, p+1);
                         du.exportImage(xContext, xMCF, currShape, outputDir, p + 1, s + 1);
                     } else if (currType.equalsIgnoreCase("com.sun.star.drawing.CustomShape")) {
-                        if (excludeCustomShapes) {
-                            mylog.debug("SKIPPING CustomShape (%d) on page %d", s+1, p+1);
-                        } else {
+                        if (includeCustomShapes) {
                             mylog.debug("Handling CustomShape (%d) on page %d", s+1, p+1);
                             du.exportImage(xContext, xMCF, currShape, outputDir, p+1, s+1);
-                        }
+                        } else
+                            mylog.debug("SKIPPING CustomShape (%d) on page %d", s+1, p+1);
                     } else {
                         mylog.debug("SKIPPING unhandled shape type '%s' (%d) on page %d", currType, s+1, p+1);
                     }

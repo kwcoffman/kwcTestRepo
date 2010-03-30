@@ -47,7 +47,7 @@ public class OpenOfficeUNODecomposition {
             "[ --extract <options> | --replace <options> | --cite <options> | --copy <options> | --json <file>]\n" +
             "Global options: [--verbose] [--help] " +
             "--json <file>\n" +
-            "--extract [ --exclude-custom-shapes ] --input <file> --output-dir <dir>\n" +
+            "--extract [ --include-custom-shapes ] --input <file> --output-dir <dir>\n" +
             "--replace <options> --input <file> --newimage <file> --pagenum <pagenum> --imagenum <imagenum>\n" +
             "--cite <options> --input <file> --citeimage <file> --pagenum <pagenum> --imagenum <imagenum>\n" +
             "--copy <options> --input <file> --output <file>";
@@ -174,7 +174,7 @@ public class OpenOfficeUNODecomposition {
 
         opt.addOption("h", "help", false, "Print this usage information");
         opt.addOption("l", "loglevel", true, "Set logging level (off, fatal, error, warn, info, debug, all) default is warn");
-        opt.addOption("xc", "exclude-custom-shapes", false, "Do not include Custom shapes when extracting");
+        opt.addOption("nc", "include-custom-shapes", false, "Include Custom shapes while extracting images");
 
         opt.addOption("i", "input", true, "Input file name (full path)");
         opt.addOption("o", "output", true, "Output file name (full path)");
@@ -183,7 +183,7 @@ public class OpenOfficeUNODecomposition {
         opt.addOption("te", "citetext", true, "Full citation text");
         opt.addOption("d", "output-dir", true, "Name of directory to receive output");
         opt.addOption("m", "commandlist", true, "List of commands");
-        opt.addOption("jr", "jsonresult", true, "Output JSON result file (ignored except when using json input)");
+        opt.addOption("jr", "json-result", true, "Output JSON result file (ignored except when using json input)");
 
         opt.addOption("p", "pagenum", true, "Page number");
         opt.addOption("g", "imagenum", true, "Image number");
@@ -235,8 +235,8 @@ public class OpenOfficeUNODecomposition {
             dp.setInputFile(cl.getOptionValue("i"));
             dp.setOutputDir(cl.getOptionValue("d"));
 
-            if (cl.hasOption("xc")) {
-                dp.setExcludeCustomShapes(true);
+            if (cl.hasOption("nc")) {
+                dp.setIncludeCustomShapes(true);
             }
         }
 

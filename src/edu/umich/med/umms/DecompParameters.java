@@ -20,7 +20,7 @@ public class DecompParameters {
     private int pageNum;
     private int imageNum;
 
-    private boolean excludeCustomShapes = false;
+    private boolean includeCustomShapes = false;
     private String validationErrorMessage;
     private boolean indexesAdjusted = false;
     private org.apache.log4j.Level myLogLevel;
@@ -54,7 +54,7 @@ public class DecompParameters {
         pageNum = df.getPageNum(opnum) - 1;
         imageNum = df.getImageNum(opnum) - 1;
         myLogLevel = org.apache.log4j.Level.WARN;
-        excludeCustomShapes = df.getExcludeCustomShapes(opnum);
+        includeCustomShapes = df.getIncludeCustomShapes(opnum);
 
         validationErrorMessage = null;
         indexesAdjusted = true;
@@ -104,9 +104,9 @@ public class DecompParameters {
     {
         this.imageNum = i;
     }
-    public void setExcludeCustomShapes(boolean b)
+    public void setIncludeCustomShapes(boolean b)
     {
-        this.excludeCustomShapes = b;
+        this.includeCustomShapes = b;
     }
 
     public boolean isValidLoggingLevel(String levelDesired)
@@ -117,7 +117,7 @@ public class DecompParameters {
             levelDesired.equalsIgnoreCase("warn")  ||
             levelDesired.equalsIgnoreCase("error") ||
             levelDesired.equalsIgnoreCase("fatal") ||
-            levelDesired.equalsIgnoreCase("all"))
+            levelDesired.equalsIgnoreCase("off"))
             return true;
         else
             return false;
@@ -137,8 +137,8 @@ public class DecompParameters {
             this.myLogLevel = org.apache.log4j.Level.ERROR;
         } else if (levelDesired.equalsIgnoreCase("fatal")) {
             this.myLogLevel = org.apache.log4j.Level.FATAL;
-        } else if (levelDesired.equalsIgnoreCase("all")) {
-            this.myLogLevel = org.apache.log4j.Level.ALL;
+        } else if (levelDesired.equalsIgnoreCase("off")) {
+            this.myLogLevel = org.apache.log4j.Level.OFF;
         } else {
             return false;
         }
@@ -190,9 +190,9 @@ public class DecompParameters {
     {
         return this.imageNum;
     }
-    public boolean getExcludeCustomShapes()
+    public boolean getIncludeCustomShapes()
     {
-        return this.excludeCustomShapes;
+        return this.includeCustomShapes;
     }
     public String getValidationErrorMessage()
     {
@@ -319,7 +319,7 @@ public class DecompParameters {
         sb.append("jsonResultFile:      " + this.jsonResultFile + "\n");
         sb.append("pageNum:             " + this.pageNum + "\n");
         sb.append("imageNum:            " + this.imageNum + "\n");
-        sb.append("excludeCustomShapes: " + this.excludeCustomShapes + "\n");
+        sb.append("includeCustomShapes: " + this.includeCustomShapes + "\n");
         return sb.toString();
     }
 }

@@ -156,14 +156,14 @@ public class DecompFileProcessor {
         return retcode;
     }
 
-    private int extractImages(String outputDirectory, boolean excludeCustomShapes) throws java.lang.Exception
+    private int extractImages(String outputDirectory, boolean includeCustomShapes) throws java.lang.Exception
     {
         outputDir = outputDirectory;
-        return extractImages(excludeCustomShapes);
+        return extractImages(includeCustomShapes);
 
     }
 
-    private int extractImages(boolean excludeCustomShapes) throws java.lang.Exception
+    private int extractImages(boolean includeCustomShapes) throws java.lang.Exception
     {
         int retcode = -1;
 
@@ -194,12 +194,12 @@ public class DecompFileProcessor {
             case 0:
                 DecompText dt = new DecompText();
                 dt.setLoggingLevel(myLogLevel);
-                retcode = dt.extractImages(xContext, xMCF, xCompDoc, outputDir, excludeCustomShapes);
+                retcode = dt.extractImages(xContext, xMCF, xCompDoc, outputDir, includeCustomShapes);
                 break;
             case 2:
                 DecompImpress di = new DecompImpress();
                 di.setLoggingLevel(myLogLevel);
-                retcode = di.extractImages(xContext, xMCF, xCompDoc, outputDir, excludeCustomShapes);
+                retcode = di.extractImages(xContext, xMCF, xCompDoc, outputDir, includeCustomShapes);
                 break;
             case 1:
             default:
@@ -287,7 +287,7 @@ public class DecompFileProcessor {
         try {
             switch (dp.getOperation()) {
                 case EXTRACT:
-                    retcode = this.extractImages(dp.getOutputDir(), dp.getExcludeCustomShapes());
+                    retcode = this.extractImages(dp.getOutputDir(), dp.getIncludeCustomShapes());
                     break;
                 case REPLACE:
                     retcode = this.replaceImage(dp.getRepImageFile(), dp.getPageNum(), dp.getImageNum());
