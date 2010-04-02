@@ -117,6 +117,9 @@ public class DecompImpress {
 
                 // Loop through all the shapes within the page
                 for (int s = 0; s < shapeCount; s++) {
+
+                    String pictureURL = null;
+
                     currShape = getPageShape(currPage, s);
                     if (currShape == null) {
                         mylog.error("Failed to get currShape (%d) from page %d!", s+1, p+1);
@@ -132,15 +135,35 @@ public class DecompImpress {
 
                     /* Note that we specifically ignore TitleTextShape, OutlinerShape, and LineShape */
                     if (currType.equalsIgnoreCase("com.sun.star.drawing.GraphicObjectShape")) {
+                        /*
+                         * Note that GraphicObjectShape is handled differently so that we can keep
+                         * the image in the original format.  du.exportImage saves everything as .png
+                         *
+                         * The try/catch below is used to catch cases where GraphicStreamURL is not set.
+                         * In that case we fall back to GraphicURL.
+                         */
                         mylog.debug("Handling GraphicObjectShape (%d) on page %d", s+1, p+1);
-//                        exportImage(xContext, xMCF, currShape, outputDir, p+1, s+1);
                         XPropertySet shapeProps = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, currShape);
-//                        String pictureURL = shapeProps.getPropertyValue("GraphicURL").toString();  // ?? Original code (that once worked) used this ??
-                        String pictureURL = shapeProps.getPropertyValue("GraphicStreamURL").toString();
-//                        pictureURL = pictureURL.substring(27);  // Chop off the leading "vnd.sun.star.GraphicObject:"
-                        pictureURL = pictureURL.substring(30);  // Chop off the leading   "vnd.sun.star.Package:Pictures/"
-                        String outName = DecompUtil.constructBaseImageName(outputDir, p+1, s+1);
-                        du.extractImageByURL(xContext, xMCF, xCompDoc, pictureURL, outName);
+                        try {
+                            pictureURL = shapeProps.getPropertyValue("GraphicStreamURL").toString();
+                            pictureURL = pictureURL.substring(30);  // Chop off the leading   "vnd.sun.star.Package:Pictures/"
+                        } catch (java.lang.Exception ex) {
+                            try {
+                                pictureURL = shapeProps.getPropertyValue("GraphicURL").toString();
+                                pictureURL = pictureURL.substring(27);  // Chop off the leading "vnd.sun.star.GraphicObject:"
+                            } catch (java.lang.Exception e) {
+                                mylog.debug("extractImages: failed to get GraphicStreamURL or GraphicURL for GraphicObjectShape %d on page %d", s+1, p+1);
+                            }
+                        }
+                        if (pictureURL == null) {
+                            du.exportImage(xContext, xMCF, currShape, outputDir, p+1, s+1);
+                        } else {
+                            String outName = DecompUtil.constructBaseImageName(outputDir, p+1, s+1);
+                            du.extractImageByURL(xContext, xMCF, xCompDoc, pictureURL, outName);
+                        }
+                    } else if (currType.equalsIgnoreCase("com.sun.star.drawing.OLE2Shape")) {
+                        mylog.debug("Handling OLE2Shape (%d) on page %d", s+1, p+1);
+                        du.exportImage(xContext, xMCF, currShape, outputDir, p+1, s+1);
                     } else if (currType.equalsIgnoreCase("com.sun.star.drawing.TableShape")) {
                         mylog.debug("Handling TableShape (%d) on page %d", s+1, p+1);
                         du.exportImage(xContext, xMCF, currShape, outputDir, p+1, s+1);
@@ -148,28 +171,30 @@ public class DecompImpress {
                         mylog.debug("Handling GroupShape (%d) on page %d", s+1, p+1);
                         du.exportImage(xContext, xMCF, currShape, outputDir, p + 1, s + 1);
                     } else if (currType.equalsIgnoreCase("com.sun.star.drawing.CustomShape")) {
-                        if (includeCustomShapes) {
+                        XPropertySet shapeProps = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, currShape);
+                        String fillBmURL = shapeProps.getPropertyValue("FillBitmapURL").toString();
+                        if (fillBmURL.contains("10000000000000200000002000309F1C")) {
+                            mylog.debug("SKIPPING boring image 10000000000000200000002000309F1C");
+                        } else {
                             mylog.debug("Handling CustomShape (%d) on page %d", s+1, p+1);
                             du.exportImage(xContext, xMCF, currShape, outputDir, p+1, s+1);
-                        } else
-                            mylog.debug("SKIPPING CustomShape (%d) on page %d", s+1, p+1);
+                        }
                     } else {
                         mylog.debug("SKIPPING unhandled shape type '%s' (%d) on page %d", currType, s+1, p+1);
                     }
                 }
             }
         } catch (IndexOutOfBoundsException ex) {
-            mylog.error("extractImages: Caught IndexOutOfBoundsException!");
+            mylog.error("extractImages: Caught IndexOutOfBoundsException: %s", ex.getMessage());
             return 40;
             //Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
         } catch (WrappedTargetException ex) {
-            mylog.error("extractImages: Caught WrappedTargetException!");
+            mylog.error("extractImages: Caught WrappedTargetException: %s", ex.getMessage());
             return 41;
             //Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (UnknownPropertyException ex) {
-            mylog.error("extractImages: Caught UnknownPropertyException!");
+        } catch (java.lang.Exception ex) {
+            mylog.error("extractImages: Caught Exception: %s", ex.getMessage());
             return 42;
-            //Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
         }
         return 0;
     }
