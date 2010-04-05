@@ -173,10 +173,10 @@ public class DecompImpress {
                     } else if (currType.equalsIgnoreCase("com.sun.star.drawing.CustomShape")) {
                         XPropertySet shapeProps = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, currShape);
                         String fillBmURL = shapeProps.getPropertyValue("FillBitmapURL").toString();
-                        if (fillBmURL.contains("10000000000000200000002000309F1C")) {
-                            mylog.debug("SKIPPING boring image 10000000000000200000002000309F1C");
+                        if (fillBmURL.contains("10000000000000200000002000309F1C") || fillBmURL.contains("00000000000000000000000000000000")) {
+                            mylog.debug("SKIPPING boring image with fillBitmapURL '%s'", fillBmURL);
                         } else {
-                            mylog.debug("Handling CustomShape (%d) on page %d", s+1, p+1);
+                            mylog.debug("Handling CustomShape (%d) on page %d, with fillBitmapURL of '%s'", s+1, p+1, fillBmURL);
                             du.exportImage(xContext, xMCF, currShape, outputDir, p+1, s+1);
                         }
                     } else {
