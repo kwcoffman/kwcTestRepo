@@ -276,7 +276,7 @@ public class DecompUtil {
     {
 
         XPropertySet shapeProps = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, page);
-        String fname = String.format("%s/%s-%05d.%s", outputDir, "contextimage", p, "png");
+        String fname = String.format("%s/%s%03d.%s", outputDir, "Slide", p, "png");
 
         PropertyValue outProps[] = new PropertyValue[2];
         outProps[0] = new PropertyValue();
