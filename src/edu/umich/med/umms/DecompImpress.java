@@ -45,8 +45,6 @@ import com.sun.star.text.XTextRange;
 import com.sun.star.uno.Exception;
 import com.sun.star.uno.UnoRuntime;
 import com.sun.star.uno.XComponentContext;
-import java.util.regex.Pattern;
-import java.util.regex.Matcher;
 
 
 /**
@@ -456,114 +454,6 @@ public class DecompImpress {
     }
 
     /**
-     * Utility function to parse the full citation string
-     * Returns either the short citation to be included in the
-     * main presentation with the image, or the License URL
-     * portion.
-     * <p>
-     * If the full citation string cannot be parsed, the full
-     * string is returned for the short citation, and nothing
-     * is returned for the License URL.
-     *
-     * @param fullCitation
-     * @param whichpart
-     * @return
-     */
-    private String parseFullCitation(String fullCitation, int whichpart)
-    {
-        final String REGEXP = "(.*) (http://.*), (.*) (http://.*)";
-        Pattern fullPattern = Pattern.compile(REGEXP);
-        Matcher fullMatcher = fullPattern.matcher(fullCitation);
-        boolean fullFound = false;
-        int fullGroups;
-
-        fullFound = fullMatcher.find();
-        if(!fullFound) {
-            switch (whichpart) {
-                case 1:  // Short citation
-                    return new String(fullCitation);
-                case 2:  // License URL
-                    return null;
-                default:
-                    return null;
-            }
-        }
-
-        fullGroups = fullMatcher.groupCount();
-        if (fullGroups != 4)
-            return null;
-
-        switch (whichpart) {
-            case 1:  // Short citation
-                return new String(fullMatcher.group(1) + " " + fullMatcher.group(3));
-            case 2:  // License URL
-                return fullMatcher.group(4);
-            default:
-                return null;
-        }
-    }
-
-    /**
-     * Given a full citation string, return a short string
-     * which can be placed in the presentation with the image
-     *
-     * @param fullCitation
-     * @return
-     */
-    private String getShortCitation(String fullCitation)
-    {
-        return parseFullCitation(fullCitation, 1);
-    }
-
-    /**
-     * Given a full citation string, return the License URL portion
-     *
-     * @param fullCitation
-     * @return
-     */
-    private String getLicenseURL(String fullCitation)
-    {
-        return parseFullCitation(fullCitation, 2);
-    }
-
-
-    /**
-     * Assuming a creativecommons license URL, return the URL to the "badge" icon
-     *
-     * @param licenseURL
-     * @return
-     */
-    private String getBadgeURLfromLicenseURL(String licenseURL)
-    {
-        final String URLEXP = "http://.*\\.?creativecommons.org/licenses/([^/]*)/([^/]*)/?";
-        boolean urlFound = false;
-        int urlGroups;
-
-        // Transform the License URL to find the license image "badge" URL
-        Pattern urlPattern = Pattern.compile(URLEXP);
-        Matcher urlMatcher = urlPattern.matcher(licenseURL);
-
-        urlFound = urlMatcher.find();
-        if (!urlFound) {
-            //System.out.printf("No URL match found\n");
-            return null;
-        } else {
-            urlGroups = urlMatcher.groupCount();
-            for (int i = 0; i <= urlGroups; i++) {
-                //System.out.printf("URL group %d is \"%s\"\n", i, urlMatcher.group(i));
-            }
-            if (urlGroups != 2) {
-                //System.out.printf("The License URL is not creativecommons...\n");
-                return null;
-            } else {
-                String badgeURL = String.format("http://i.creativecommons.org/l/%s/%s/88x31.png", urlMatcher.group(1), urlMatcher.group(2));
-                //System.out.printf("The Badge URL is \"%s\"\n\n", badgeURL);
-                return badgeURL;
-            }
-        }
-    }
-
-    /**
      * Adds citation information for an image to the slide.
      * Originally from http://www.oooforum.org/forum/viewtopic.phtml?t=45734
      *
@@ -589,6 +479,7 @@ public class DecompImpress {
             String shortCitation = null, licenseURL = null, badgeURL = null;
             XShapes xShapes;
             XShape xCIShape = null, xOrigImage = null;
+            CitationManipulate citemanip = new CitationManipulate(citationText);
 
             XDrawPage drawPage = getDrawPageByIndex(xCompDoc, p);
             if (drawPage == null)
@@ -600,10 +491,8 @@ public class DecompImpress {
                     UnoRuntime.queryInterface(XPropertySet.class, oOrigImage);
             xOrigImage = (XShape) UnoRuntime.queryInterface(XShape.class, oOrigImage);
 
-            shortCitation = getShortCitation(citationText);
-            licenseURL = getLicenseURL(citationText);
-            if (licenseURL != null)
-                badgeURL = getBadgeURLfromLicenseURL(licenseURL);
+            shortCitation = citemanip.getShortCitation();
+            badgeURL = citemanip.getBadgeURL();
 
             if (badgeURL != null) {
                 // Add citation image
