@@ -46,11 +46,11 @@ public class OpenOfficeUNODecomposition {
     private static final String Usage =
             "[ --extract <options> | --replace <options> | --cite <options> | --copy <options> | --json <file>]\n" +
             "Global options: [--verbose] [--help] " +
-            "--json <file>\n" +
+            "--json <file> --json-result <file>\n" +
             "--extract [ --include-custom-shapes ] --input <file> --output-dir <dir>\n" +
             "--replace <options> --input <file> --newimage <file> --pagenum <pagenum> --imagenum <imagenum>\n" +
             "--cite <options> --input <file> --citeimage <file> --pagenum <pagenum> --imagenum <imagenum>\n" +
-            "--copy <options> --input <file> --output <file>";
+            "--copy <options> --input <file> --output <file> --boilerplateFile <file>";
 
     private com.spinn3r.log5j.Logger mylog = com.spinn3r.log5j.Logger.getLogger();
     private org.apache.log4j.Level myLogLevel = org.apache.log4j.Level.WARN;
@@ -83,8 +83,9 @@ public class OpenOfficeUNODecomposition {
     {
         String outFile = dp.getOutputFile();
         try {
-            if (outFile != null)
-                fp.saveTo(outFile);
+            if (outFile != null) {
+                fp.saveTo(outFile, dp.getBoilerPlateFile());
+            }
         } catch (java.lang.Exception e) {
             mylog.error("Caught Exception while saving file");
         }
@@ -178,6 +179,7 @@ public class OpenOfficeUNODecomposition {
 
         opt.addOption("i", "input", true, "Input file name (full path)");
         opt.addOption("o", "output", true, "Output file name (full path)");
+        opt.addOption("bp", "boilerplateFile", true, "File containing boilerplate slides (full path)");
         opt.addOption("n", "newimage", true, "Replacement (new) image file (full path)");
         opt.addOption("ti", "citeimage", true, "Image file containing citation information (full path)");
         opt.addOption("te", "citetext", true, "Full citation text");

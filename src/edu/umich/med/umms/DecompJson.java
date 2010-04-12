@@ -42,6 +42,7 @@ public class DecompJson {
             private String repImageFile;
             private String citationImageFile;
             private String citationText;
+            private String boilerplateFile;
             private int pageNum;
             private int imageNum;
             private boolean includeCustomShapes;
@@ -84,6 +85,9 @@ public class DecompJson {
         }
         public String getOutputDir(int i) {
             return this.decompFileOps[i].outputDir;
+        }
+        public String getBoilerPlateFile(int i) {
+            return this.decompFileOps[i].boilerplateFile;
         }
         public String getRepImageFile(int i) {
             return this.decompFileOps[i].repImageFile;

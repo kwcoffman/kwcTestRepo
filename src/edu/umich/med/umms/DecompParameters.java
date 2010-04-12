@@ -13,6 +13,7 @@ public class DecompParameters {
     private String outputDir;
 
     private String repImageFile;
+    private String boilerplateFile;
     private String citationImageFile;
     private String citationText;
     private String jsonCommandFile;
@@ -30,6 +31,7 @@ public class DecompParameters {
         inputFile = null;
         outputFile = null;
         outputDir = null;
+        boilerplateFile = null;
         repImageFile = null;
         citationImageFile = null;
         citationText = null;
@@ -49,6 +51,8 @@ public class DecompParameters {
         outputFile = df.getOutputFile(opnum);
         outputDir = df.getOutputDir(opnum);
         repImageFile = df.getRepImageFile(opnum);
+        boilerplateFile = df.getBoilerPlateFile(opnum);
+
         citationImageFile = df.getCitationImageFile(opnum);
         citationText = df.getCitationText(opnum);
         pageNum = df.getPageNum(opnum) - 1;
@@ -75,6 +79,9 @@ public class DecompParameters {
     public void setOutputDir(String f)
     {
         this.outputDir = f;
+    }
+    public void setBoilerPlateFile(String f) {
+        this.boilerplateFile = f;
     }
     public void setRepImageFile(String f)
     {
@@ -161,6 +168,9 @@ public class DecompParameters {
     public String getOutputDir()
     {
         return this.outputDir;
+    }
+    public String getBoilerPlateFile() {
+        return this.boilerplateFile;
     }
     public String getRepImageFile()
     {
@@ -315,6 +325,7 @@ public class DecompParameters {
         sb.append("repImageFile:        " + this.repImageFile + "\n");
         sb.append("citationImageFile:   " + this.citationImageFile + "\n");
         sb.append("citationText:        " + this.citationText + "\n");
+        sb.append("boilerplateFile:     " + this.boilerplateFile + "\n");
         sb.append("jsonCommandFile:     " + this.jsonCommandFile + "\n");
         sb.append("jsonResultFile:      " + this.jsonResultFile + "\n");
         sb.append("pageNum:             " + this.pageNum + "\n");

@@ -566,24 +566,18 @@ public class DecompImpress {
                                       XDesktop xDesktop,
                                       XMultiComponentFactory xMCF,
                                       XComponent destDoc,
-                                      String fileName)
+                                      String srcFileUrl)
     {
         XComponent srcDoc = null;
-        String srcFileUrl = DecompUtil.fileNameToOOoURL(fileName);
         XDrawPagesSupplier destPagesSuppl;
         XDrawPagesSupplier srcPagesSuppl;
         PropertyValue props[] = new PropertyValue[0];
-
-        // Duplicate the original first page since we can't insert before it...
-        XDrawPage destDP = getDrawPageByIndex(destDoc, 0);
-        XDrawPageDuplicator xdup = UnoRuntime.queryInterface(XDrawPageDuplicator.class, destDoc);
-        xdup.duplicate(destDP);
 
         // Query for the XDrawPagesSupplier interfaces
         try {
             srcDoc = DecompUtil.openFileForProcessing(xDesktop, srcFileUrl);
         } catch (java.lang.Exception ex) {
-            mylog.error("insertFrontBoilerplate: Exception while opening source file: " + fileName);
+            mylog.error("insertFrontBoilerplate: Exception while opening source file: " + srcFileUrl);
             return -1;
         }
 
@@ -594,6 +588,11 @@ public class DecompImpress {
             srcDoc.dispose();
             return -1;
         }
+
+        // Duplicate the original first page since we can't insert before it...
+        XDrawPage destDP = getDrawPageByIndex(destDoc, 0);
+        XDrawPageDuplicator xdup = UnoRuntime.queryInterface(XDrawPageDuplicator.class, destDoc);
+        xdup.duplicate(destDP);
 
         XDrawPages srcDrawPages = srcPagesSuppl.getDrawPages();
         int srcCount = srcDrawPages.getCount();

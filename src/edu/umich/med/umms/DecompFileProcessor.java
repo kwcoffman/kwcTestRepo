@@ -23,6 +23,7 @@ public class DecompFileProcessor {
     private String outputFileUrl = "";
     private String outputDir = "";
     private String fileType = "";
+    private String boilerplateUrl = "";
 
     private OOoFormat origFileFormat = null;
     private OOoFormat ooFileFormat = null;
@@ -82,6 +83,10 @@ public class DecompFileProcessor {
         outputFileUrl = DecompUtil.fileNameToOOoURL(newOutputFile);
     }
 
+    public void setBoilerPlateFile(String bpFileName)
+    {
+        boilerplateUrl = DecompUtil.fileNameToOOoURL(bpFileName);
+    }
     public void setOutputDir(String newOutputDir)
     {
         outputDir = newOutputDir;
@@ -238,11 +243,11 @@ public class DecompFileProcessor {
     /*
      * This is only used for PowerPoint files
      */
-    public int addFrontMatter(String originFile)
+    public int addFrontMatter(String bpUrl)
     {
         DecompImpress di = new DecompImpress();
         di.setLoggingLevel(myLogLevel);
-        return di.insertFrontBoilerplate(xContext, xDesktop, xMCF, xCompDoc, originFile);
+        return di.insertFrontBoilerplate(xContext, xDesktop, xMCF, xCompDoc, bpUrl);
     }
     
     private int save() throws java.lang.Exception
@@ -251,7 +256,7 @@ public class DecompFileProcessor {
         if (origFileFormat.getHandlerType() == 2) {
             int addedFrontPages;
 
-            addedFrontPages = addFrontMatter("/Users/kwc/Downloads/RecompBoilerplate.ppt");  // XXX This needs to be a parameter!!
+            addedFrontPages = addFrontMatter(boilerplateUrl);
             if (addedFrontPages < 0)
                 addedFrontPages = 0;
             addCitationPages(addedFrontPages);
@@ -271,9 +276,10 @@ public class DecompFileProcessor {
     }
 
 
-    public int saveTo(String outputFile) throws java.lang.Exception
+    public int saveTo(String outputFile, String boilerplateFile) throws java.lang.Exception
     {
         outputFileUrl = DecompUtil.fileNameToOOoURL(outputFile);
+        boilerplateUrl = DecompUtil.fileNameToOOoURL(boilerplateFile);
         return save();
     }
 
@@ -296,7 +302,7 @@ public class DecompFileProcessor {
                     retcode = this.citeImage(dp.getCitationText(), dp.getCitationImageFile(), dp.getPageNum(), dp.getImageNum());
                     break;
                 case SAVE:
-                    retcode = this.saveTo(dp.getOutputFile());
+                    retcode = this.saveTo(dp.getOutputFile(), dp.getBoilerPlateFile());
                     break;
             }
         } catch (java.lang.Exception e) {
