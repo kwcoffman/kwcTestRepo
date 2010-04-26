@@ -472,6 +472,9 @@ public class DecompUtil {
     public static String fileNameToOOoURL(final String fName) {
         StringBuilder sLoadUrl;
 
+        if (fName == null)
+            return null;
+
         // XXX Consider the case where we actually get a URL in
         if (fName.contains("://"))
             sLoadUrl = new StringBuilder();

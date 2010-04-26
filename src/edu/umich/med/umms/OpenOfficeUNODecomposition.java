@@ -277,6 +277,7 @@ public class OpenOfficeUNODecomposition {
             dp.setOperation(DecompOperation.SAVE);
             dp.setInputFile(cl.getOptionValue("i"));
             dp.setOutputFile(cl.getOptionValue("o"));
+            dp.setBoilerPlateFile(cl.getOptionValue("bp"));
         }
 
         /* verify things are valid for the given function */

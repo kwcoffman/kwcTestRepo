@@ -573,6 +573,9 @@ public class DecompImpress {
         XDrawPagesSupplier srcPagesSuppl;
         PropertyValue props[] = new PropertyValue[0];
 
+        if (srcFileUrl == null)
+            return 0;
+
         // Query for the XDrawPagesSupplier interfaces
         try {
             srcDoc = DecompUtil.openFileForProcessing(xDesktop, srcFileUrl);
