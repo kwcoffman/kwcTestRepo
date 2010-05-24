@@ -87,7 +87,8 @@ public class OpenOfficeUNODecomposition {
                 fp.saveTo(outFile, dp.getBoilerPlateFile());
             }
         } catch (java.lang.Exception e) {
-            mylog.error("Caught Exception while saving file");
+            mylog.error("Caught Exception (" + e.getMessage() + ") while saving file");
+            e.printStackTrace();
         }
     }
 
@@ -97,7 +98,8 @@ public class OpenOfficeUNODecomposition {
         try {
             fp.dispose();
         } catch (java.lang.Exception e) {
-            mylog.error("Caught Exception while disposing file");
+            mylog.error("Caught Exception (" + e.getMessage() + ") while disposing file");
+            e.printStackTrace();
         }
     }
 
@@ -113,7 +115,8 @@ public class OpenOfficeUNODecomposition {
             return new String("Error getting FileProcessor for file '" + dp.getInputFile() + "'");
 
         ret = processSingleFileOperation(dp, fp);
-        saveFile(dp, fp);
+        if (dp.getOperation() != dp.getOperation().SAVE)
+            saveFile(dp, fp);
         disposeFile(fp);
        
         return ret;

@@ -32,11 +32,13 @@ public class DecompFileProcessor {
     private DecompUtil myutil;
 
     private DecompCitationCollection citations;
+    private DecompDelayedRemovalCollection imageRemovals;
 
     public DecompFileProcessor()
     {
         myutil = new DecompUtil();
         citations = new DecompCitationCollection();
+        imageRemovals = new DecompDelayedRemovalCollection();
     }
 
     public DecompFileProcessor(XComponentContext xCtx, XDesktop xDt, String infile) throws java.lang.Exception
@@ -61,6 +63,7 @@ public class DecompFileProcessor {
             throw e;
         }
         citations = new DecompCitationCollection();
+        imageRemovals = new DecompDelayedRemovalCollection();
     }
 
     public void setXComponentContext(XComponentContext xCtx)
@@ -122,7 +125,7 @@ public class DecompFileProcessor {
                 DecompImpress di = new DecompImpress();
                 di.setLoggingLevel(myLogLevel);
                 retcode = di.replaceImage(xContext, xMCF, xCompDoc, "origname",
-                        DecompUtil.fileNameToOOoURL(repImageFile), pgnum, imgnum);
+                        DecompUtil.fileNameToOOoURL(repImageFile), pgnum, imgnum, imageRemovals);
                 break;
             case 1: // Spreadsheets are not currently supported
             default:
@@ -223,43 +226,36 @@ public class DecompFileProcessor {
     /*
      * This is only used for PowerPoint files
      */
-    private void addCitationPages(int pageOffset)
+    private void addCitationPages(DecompImpress di, int pageOffset)
     {
         int i, j;
         DecompCitationCollection.DecompCitationCollectionEntry cpe;
-        DecompImpress di;
 
         if (citations.numEntries() == 0)
             return;
 
         DecompCitationCollection.DecompCitationCollectionEntry[] cpeArray = citations.getDecompCitationCollectionEntryArray();
 
-        di = new DecompImpress();
-        di.setLoggingLevel(myLogLevel);
         di.addCitationPages(xCompDoc, cpeArray, pageOffset);
 
     }
 
-    /*
-     * This is only used for PowerPoint files
-     */
-    public int addFrontMatter(String bpUrl)
-    {
-        DecompImpress di = new DecompImpress();
-        di.setLoggingLevel(myLogLevel);
-        return di.insertFrontBoilerplate(xContext, xDesktop, xMCF, xCompDoc, bpUrl);
-    }
     
     private int save() throws java.lang.Exception
     {
         // Do some extra work for PowerPoint files
         if (origFileFormat.getHandlerType() == 2) {
             int addedFrontPages;
+            DecompImpress di = new DecompImpress();
+            di.setLoggingLevel(myLogLevel);
 
-            addedFrontPages = addFrontMatter(boilerplateUrl);
+            // Remove images before messing up page numbers!
+            di.removeImages(xContext, xMCF, xCompDoc, imageRemovals);
+
+            addedFrontPages = di.insertFrontBoilerplate(xContext, xDesktop, xMCF, xCompDoc, boilerplateUrl);
             if (addedFrontPages < 0)
                 addedFrontPages = 0;
-            addCitationPages(addedFrontPages);
+            addCitationPages(di, addedFrontPages);
         }
 
         if (outputFileUrl != null && outputFileUrl.compareTo("") != 0) {

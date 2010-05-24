@@ -100,6 +100,7 @@ public class DecompUtil {
         propertyValues[0] = new PropertyValue();
         propertyValues[0].Name = "Hidden";
         propertyValues[0].Value = new Boolean(true);
+        //propertyValues[0].Value = new Boolean(false);  // XXX FOR TESTING XXX
 
 // XXX Restore to READ-ONLY?  Or add an option to the function?
 //        propertyValues[1] = new PropertyValue();

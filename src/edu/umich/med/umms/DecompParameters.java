@@ -55,8 +55,8 @@ public class DecompParameters {
 
         citationImageFile = df.getCitationImageFile(opnum);
         citationText = df.getCitationText(opnum);
-        pageNum = df.getPageNum(opnum) - 1;
-        imageNum = df.getImageNum(opnum) - 1;
+        pageNum = df.getPageNum(opnum) - 1; // pages are one-based
+        imageNum = df.getImageNum(opnum); // images are zero-based
         myLogLevel = org.apache.log4j.Level.WARN;
         includeCustomShapes = df.getIncludeCustomShapes(opnum);
 
@@ -233,7 +233,6 @@ public class DecompParameters {
         if (this.indexesAdjusted)
             return;
         this.pageNum--;
-        this.imageNum--;
         this.indexesAdjusted = true;
     }
 
