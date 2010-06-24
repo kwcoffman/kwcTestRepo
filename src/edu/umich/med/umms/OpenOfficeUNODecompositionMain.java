@@ -26,9 +26,9 @@ public class OpenOfficeUNODecompositionMain {
      */
     public static void main(String[] args)
     {
-        XComponentContext xContext = null;
-        XMultiComponentFactory xMCF = null;
-        XDesktop xDesktop = null;
+//        XComponentContext xContext = null;
+//        XMultiComponentFactory xMCF = null;
+//        XDesktop xDesktop = null;
         Options opt = new Options();
         DecompParameters dp = new DecompParameters();
         int err = 1;
@@ -42,7 +42,7 @@ public class OpenOfficeUNODecompositionMain {
             System.exit(1);
         }
 
-        // get the remote office component context
+/*        // get the remote office component context
         try {
             xContext = Bootstrap.bootstrap();
         } catch (com.sun.star.comp.helper.BootstrapException e) {
@@ -55,10 +55,10 @@ public class OpenOfficeUNODecompositionMain {
 
 
         try {
-            /* A desktop environment contains tasks with one or more
-            frames in which components can be loaded. Desktop is the
-            environment for components which can instantiate within
-            frames. */
+            // A desktop environment contains tasks with one or more
+            // frames in which components can be loaded. Desktop is the
+            // environment for components which can instantiate within
+            // frames.
             xDesktop = (XDesktop) UnoRuntime.queryInterface(XDesktop.class,
                     xMCF.createInstanceWithContext("com.sun.star.frame.Desktop",
                     xContext));
@@ -66,11 +66,11 @@ public class OpenOfficeUNODecompositionMain {
             mylog.fatal("Error getting OpenOffice desktop: " + e.getMessage());
             System.exit(3);
         }
-
+*/
         if (dp.getOperation() == DecompOperation.JSON) {
-            errstring = decomp.processJsonFile(xContext, xDesktop, dp);
+            errstring = decomp.processJsonFile(dp);
         } else {
-            errstring = decomp.processSingleFile(xContext, xDesktop, dp);
+            errstring = decomp.processSingleFile(dp);
         }
 
         if (errstring != null) {

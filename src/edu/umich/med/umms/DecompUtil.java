@@ -7,6 +7,7 @@
 
 package edu.umich.med.umms;
 
+import com.sun.star.util.CloseVetoException;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.IOException;
@@ -21,6 +22,7 @@ import com.sun.star.beans.Property;
 import com.sun.star.beans.PropertyValue;
 import com.sun.star.beans.XPropertySet;
 import com.sun.star.beans.UnknownPropertyException;
+import com.sun.star.comp.helper.Bootstrap;
 
 import com.sun.star.container.XNameAccess;
 import com.sun.star.container.XNameContainer;
@@ -63,6 +65,7 @@ import com.sun.star.ucb.XSimpleFileAccess2;
 import com.sun.star.uno.Exception;
 import com.sun.star.uno.UnoRuntime;
 import com.sun.star.uno.XComponentContext;
+import com.sun.star.util.XCloseable;
 import java.io.File;
 import java.util.UUID;
 
@@ -119,6 +122,27 @@ public class DecompUtil {
         return xCompLoader.loadComponentFromURL(inputFileUrl, "_blank", 0, propertyValues);
     }
 
+    public void closeDocument(XComponentContext xContext, XComponent doc)
+    {
+        XStorable xStorable = (XStorable) UnoRuntime.queryInterface(XStorable.class, doc);
+        if (xStorable == null) {
+            mylog.error("closeDocument: Unable to get XStorable interface!");
+            return;
+        }
+        XCloseable xCloseable = (XCloseable) UnoRuntime.queryInterface(XCloseable.class, xStorable);
+        if (xCloseable == null) {
+            mylog.error("closeDocument: Unable to get XCloseable interface, calling dispose");
+            doc.dispose();
+        } else {
+            try {
+                mylog.error("closeDocument: Calling CLOSE!");
+                xCloseable.close(false);
+            } catch (CloseVetoException ex) {
+                mylog.error("closeDocument: Unable to close document: CloseVetoException!!");
+            }
+        }
+    }
+
     public static XPropertySet getObjectPropertySet(Object origObj)
     {
         XPropertySet xPropSet = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, origObj);
@@ -170,7 +194,7 @@ public class DecompUtil {
             try {
                 mylog.debug("    Property " + props[x].Name + " = " + xShapeProperties.getPropertyValue(props[x].Name));
             } catch (UnknownPropertyException ex) {
-                Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
+                mylog.error("printShapeProperties: unknown property encountered");
             }
         }
         mylog.debug("");
@@ -188,7 +212,7 @@ public class DecompUtil {
             try {
                 mylog.debug("    Property " + props[x].Name + " = " + xShapeProperties.getPropertyValue(props[x].Name));
             } catch (UnknownPropertyException ex) {
-                Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
+                mylog.error("printObjectProperties: unknown property encountered");
             }
         }
         mylog.debug("");
@@ -397,7 +421,7 @@ public class DecompUtil {
 
             }
         } catch (Exception ex) {
-            Logger.getLogger(OpenOfficeUNODecomposition.class.getName()).log(Level.SEVERE, null, ex);
+	    mylog.error("ExtractImageByURL: Caught Exception: " + ex.getMessage());
             return;
         }
 
@@ -413,6 +437,7 @@ public class DecompUtil {
             oInterface = xMCF.createInstanceWithContext(
                     "com.sun.star.document.TypeDetection", xContext);
         } catch (java.lang.Exception ex) {
+	    mylog.error("printDocumentType: Caught Exception: " + ex.getMessage());
             ex.printStackTrace();
         }
 
@@ -450,6 +475,7 @@ public class DecompUtil {
             oInterface = xMCF.createInstanceWithContext(
                     "com.sun.star.document.TypeDetection", xContext);
         } catch (java.lang.Exception ex) {
+	    mylog.error("getDocumentType: Caught Exception: " + ex.getMessage());
             ex.printStackTrace();
         }
 
@@ -509,7 +535,7 @@ public class DecompUtil {
         try {
             xStorable.storeToURL(newFNameUrl, propertyValue);
         } catch (com.sun.star.io.IOException ex) {
-            mylog.error("Storing document: " + ex.getMessage());
+            mylog.error("storeDocument: Caught Exception: " + ex.getMessage());
             ex.printStackTrace();
         }
 
@@ -633,6 +659,38 @@ public class DecompUtil {
             System.err.printf("awake\n");
         } catch (InterruptedException e) {
             e.printStackTrace();
+        }
+    }
+
+    public XComponentContext bootstrap()
+    {
+        XComponentContext xContext = null;
+        try {
+            xContext = Bootstrap.bootstrap();
+        } catch (com.sun.star.comp.helper.BootstrapException e) {
+            mylog.fatal("Error connecting to OpenOffice process: " + e.getMessage());
+        } finally {
+            return xContext;
+        }
+    }
+
+    public XDesktop getDesktop(XComponentContext xContext)
+    {
+        XDesktop xDesktop = null;
+        XMultiComponentFactory xMCF = xContext.getServiceManager();
+
+        try {
+            // A desktop environment contains tasks with one or more
+            // frames in which components can be loaded. Desktop is the
+            // environment for components which can instantiate within
+            // frames.
+            xDesktop = (XDesktop) UnoRuntime.queryInterface(XDesktop.class,
+                    xMCF.createInstanceWithContext("com.sun.star.frame.Desktop",
+                    xContext));
+        } catch (com.sun.star.uno.Exception e) {
+            mylog.fatal("Error getting OpenOffice desktop: " + e.getMessage());
+        } finally {
+            return xDesktop;
         }
     }
 }

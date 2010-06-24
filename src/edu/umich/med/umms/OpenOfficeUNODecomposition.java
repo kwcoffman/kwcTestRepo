@@ -65,11 +65,11 @@ public class OpenOfficeUNODecomposition {
         mylog.setLevel(myLogLevel);
     }
 
-    private DecompFileProcessor getFileProcessor(XComponentContext xContext, XDesktop xDesktop, String fileName)
+    private DecompFileProcessor getFileProcessor(/*XComponentContext xContext, XDesktop xDesktop,*/ String fileName)
     {
         DecompFileProcessor fp = null;
         try {
-            fp = new DecompFileProcessor(xContext, xDesktop, fileName);
+            fp = new DecompFileProcessor(/*xContext, xDesktop,*/ fileName);
         } catch (Exception e) {
             mylog.error("Error instantiating input file '%s' for processing: %s", fileName, e.getMessage());
             return null;
@@ -87,18 +87,18 @@ public class OpenOfficeUNODecomposition {
                 fp.saveTo(outFile, dp.getBoilerPlateFile());
             }
         } catch (java.lang.Exception e) {
-            mylog.error("Caught Exception (" + e.getMessage() + ") while saving file");
+            mylog.error("saveFile: Caught Exception (" + e.getMessage() + ")");
             e.printStackTrace();
         }
     }
 
 
-    private void disposeFile(DecompFileProcessor fp)
+    private void closeFile(DecompFileProcessor fp)
     {
         try {
-            fp.dispose();
+            fp.close();
         } catch (java.lang.Exception e) {
-            mylog.error("Caught Exception (" + e.getMessage() + ") while disposing file");
+            mylog.error("disposeFile: Caught Exception (" + e.getMessage() + ")");
             e.printStackTrace();
         }
     }
@@ -108,21 +108,21 @@ public class OpenOfficeUNODecomposition {
         return fp.doOperation(dp);
     }
 
-    public String processSingleFile(XComponentContext xContext, XDesktop xDesktop, DecompParameters dp) {
+    public String processSingleFile(/*XComponentContext xContext, XDesktop xDesktop,*/ DecompParameters dp) {
         String ret = null;
-        DecompFileProcessor fp = getFileProcessor(xContext, xDesktop, dp.getInputFile());
+        DecompFileProcessor fp = getFileProcessor(/*xContext, xDesktop,*/ dp.getInputFile());
         if (fp == null)
             return new String("Error getting FileProcessor for file '" + dp.getInputFile() + "'");
 
         ret = processSingleFileOperation(dp, fp);
         if (dp.getOperation() != dp.getOperation().SAVE)
             saveFile(dp, fp);
-        disposeFile(fp);
+        closeFile(fp);
        
         return ret;
     }
 
-    public String processJsonFile(XComponentContext xContext, XDesktop xDesktop, DecompParameters dp)
+    public String processJsonFile(/*XComponentContext xContext, XDesktop xDesktop,*/ DecompParameters dp)
     {
         DecompJson dj = null;
         int ret = 1;
@@ -132,6 +132,7 @@ public class OpenOfficeUNODecomposition {
             dj = new DecompJson(dp.getJsonCommandFile());
         } catch (java.lang.Exception e) {
             String msg = new String ("Exception while processing input JSON file " + dp.getJsonCommandFile() + ": " + e.getMessage());
+            e.printStackTrace();
             if (resultJsonFileName != null) {
                 dj = new DecompJson();
                 dj.setMainResult(1, msg);
@@ -144,14 +145,14 @@ public class OpenOfficeUNODecomposition {
         switch (dj.getVersion()) {
             case 1:
                 for (int i = 0; i < dj.getNumFiles(); i++) {
-                    DecompFileProcessor fp = getFileProcessor(xContext, xDesktop, dj.getFile(i).getInputFile());
+                    DecompFileProcessor fp = getFileProcessor(/*xContext, xDesktop,*/ dj.getFile(i).getInputFile());
                     if (fp != null) {
                         for (int op = 0; op < dj.getFile(i).getNumOps(); op++) {
                             DecompParameters ldp = new DecompParameters(dj.getFile(i), op);
                             retstring = processSingleFileOperation(ldp, fp);
                             dj.getFile(i).getFileOp(op).setOperationResult((retstring == null) ? 0 : 1, retstring);
                         }
-                        disposeFile(fp);
+                        closeFile(fp);
                     } else {
                         dj.getFile(i).setFileResult(1, "Error opening file" + dj.getFile(i).getInputFile());
                     }
@@ -202,6 +203,7 @@ public class OpenOfficeUNODecomposition {
             cl = parser.parse(opt, args);
         } catch (ParseException ex) {
             mylog.error("Error processing arguments: '%s'", ex.getMessage());
+            ex.printStackTrace();
             return 1;
         }
 

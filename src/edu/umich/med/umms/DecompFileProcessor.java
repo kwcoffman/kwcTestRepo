@@ -39,13 +39,18 @@ public class DecompFileProcessor {
         myutil = new DecompUtil();
         citations = new DecompCitationCollection();
         imageRemovals = new DecompDelayedRemovalCollection();
+
+        xContext = myutil.bootstrap();
+        xDesktop = myutil.getDesktop(xContext);
     }
 
-    public DecompFileProcessor(XComponentContext xCtx, XDesktop xDt, String infile) throws java.lang.Exception
+    public DecompFileProcessor(/*XComponentContext xCtx, XDesktop xDt,*/ String infile) throws java.lang.Exception
     {
-        xContext = xCtx;
-        xDesktop = xDt;
+//        xContext = xCtx;
+//        xDesktop = xDt;
         myutil = new DecompUtil();
+        xContext = myutil.bootstrap();
+        xDesktop = myutil.getDesktop(xContext);
 
         inputFileUrl = DecompUtil.fileNameToOOoURL(infile);
 
@@ -58,7 +63,7 @@ public class DecompFileProcessor {
         fileType = myutil.getDocumentType(xContext, xMCF, inputFileUrl);
         origFileFormat = OOoFormat.findFormatWithDocumentType(fileType);
         if (!DecompUtil.isaSupportedFormat(origFileFormat)) {
-            xCompDoc.dispose();
+            myutil.closeDocument(xContext, xCompDoc);
             java.lang.Exception e = new java.lang.Exception("File " + inputFileUrl + ": format " + fileType + ": unsupported file format");
             throw e;
         }
@@ -184,7 +189,7 @@ public class DecompFileProcessor {
                 xCompDoc, inputFileUrl, origFileFormat);
         if (newName != null) {
             // Save document in another format and process that
-            xCompDoc.dispose();
+            close(xCompDoc);
             inputFileUrl = DecompUtil.fileNameToOOoURL(newName);
             xCompDoc = DecompUtil.openFileForProcessing(xDesktop, inputFileUrl);
             if (xCompDoc == null) {
@@ -217,7 +222,7 @@ public class DecompFileProcessor {
         // If a temporary file was used, remove it now
         if (newName != null)
         {
-            xCompDoc.dispose();
+            close(xCompDoc);
             DecompUtil.removeTemporaryDocument(newName);
         }
         return retcode;
@@ -265,12 +270,15 @@ public class DecompFileProcessor {
         return 0;
     }
 
-    public void dispose() throws java.lang.Exception
+    public void close(XComponent doc) throws java.lang.Exception
     {
-        if (this.xCompDoc != null)
-            this.xCompDoc.dispose();
+        myutil.closeDocument(xContext, doc);
     }
 
+    public void close() throws java.lang.Exception
+    {
+        close(xCompDoc);
+    }
 
     public int saveTo(String outputFile, String boilerplateFile) throws java.lang.Exception
     {
@@ -302,12 +310,14 @@ public class DecompFileProcessor {
                     break;
             }
         } catch (java.lang.Exception e) {
-            return logOperationInformation(dp, "Caught Exception", e.getMessage());
+            ret = logOperationInformation(dp, "CAUGHT EXCEPTION", e.getMessage());
+            e.printStackTrace();
+	    return ret;
         }
         if (retcode == 0) {
             return null;
         } else {
-            return logOperationInformation(dp, "Operation Failed", null);
+            return logOperationInformation(dp, "OPERATION FAILED", null);
         }
     }
 

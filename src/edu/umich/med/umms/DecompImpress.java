@@ -15,6 +15,7 @@ import com.sun.star.beans.PropertyValue;
 import com.sun.star.beans.PropertyVetoException;
 import com.sun.star.beans.XPropertySet;
 import com.sun.star.beans.UnknownPropertyException;
+import com.sun.star.document.XDocumentInsertable;
 
 import com.sun.star.drawing.XDrawPagesSupplier;
 import com.sun.star.drawing.XDrawPages;
@@ -28,6 +29,7 @@ import com.sun.star.frame.XDispatchHelper;
 import com.sun.star.frame.XDispatchProvider;
 import com.sun.star.frame.XFrame;
 import com.sun.star.frame.XModel;
+import com.sun.star.io.IOException;
 import com.sun.star.lang.IllegalArgumentException;
 import com.sun.star.lang.XMultiComponentFactory;
 import com.sun.star.lang.XMultiServiceFactory;
@@ -108,7 +110,7 @@ public class DecompImpress {
                 currPage = getDrawPage(xDrawPages, p);
                 if (currPage == null) {
                     mylog.error("Failed to get currPage at page %d!", p+1);
-                    xCompDoc.dispose();
+                    du.closeDocument(xContext, xCompDoc);
                     return 22;
                 }
                 mylog.debug("=== Working with page %d ===", p+1);
@@ -126,7 +128,7 @@ public class DecompImpress {
                     currShape = getPageShape(currPage, s);
                     if (currShape == null) {
                         mylog.error("Failed to get currShape (%d) from page %d!", s, p+1);
-                        xCompDoc.dispose();
+                        du.closeDocument(xContext, xCompDoc);
                         return 33;
                     }
                     String currType = currShape.getShapeType();
@@ -742,12 +744,60 @@ public class DecompImpress {
         XComponent srcDoc = null;
         XDrawPagesSupplier destPagesSuppl;
         XDrawPagesSupplier srcPagesSuppl;
-        PropertyValue props[] = new PropertyValue[0];
+        PropertyValue props[] = new PropertyValue[1];
+        props[0] = new com.sun.star.beans.PropertyValue();
+//        props[0].Name = "Asynchron";
+        props[0].Name = "Asynch";
+        props[0].Value = Boolean.valueOf(false);
+
+        DecompSyncDispatch syncDispatch = new DecompSyncDispatch();
+        syncDispatch.setLoggingLevel(myLogLevel);
+        DecompUtil du = new DecompUtil();
 
         if (srcFileUrl == null)
             return 0;
 
-        // Query for the XDrawPagesSupplier interfaces
+        /* ===================================================================================================== *
+         * XXX The xDocInsertable interface is not supported!!!!!!!!!                                            *
+         * ===================================================================================================== *
+  
+         try {
+            XDrawPage drawPage = getDrawPageByIndex(destDoc, 0);
+            if (drawPage == null)
+                return 1;
+            XShapes xShapes = (XShapes) UnoRuntime.queryInterface(XShapes.class, drawPage);
+            Object oFirstShape = xShapes.getByIndex(0);
+            XShape firstShape = (XShape) UnoRuntime.queryInterface(XShape.class, oFirstShape);
+            XText xText = (XText) UnoRuntime.queryInterface(XText.class, firstShape);
+            XTextCursor xTextCursor = xText.createTextCursor();
+            XTextRange cursorRange = (XTextRange) UnoRuntime.queryInterface(XTextRange.class, xTextCursor);
+            XPropertySet xTxtProps = (XPropertySet) UnoRuntime.queryInterface(XPropertySet.class, xTextCursor);
+
+            xTextCursor.gotoStart(false);
+
+            XDocumentInsertable xDocInsertable = (XDocumentInsertable)
+                    UnoRuntime.queryInterface(XDocumentInsertable.class, xTextCursor);
+            if (xDocInsertable != null) {
+                try {
+                    mylog.error(">>>>> Attempting insertDocumentFromURL <<<<<");
+                    xDocInsertable.insertDocumentFromURL(srcFileUrl, new PropertyValue[0]);
+                } catch (IllegalArgumentException ex) {
+                    mylog.error("insertDocumentFromURL caused IllegalArgumentException");
+                } catch (IOException ex) {
+                    mylog.error("insertDocumentFromURL caused IOException");
+                }
+                return 3;  // XXX KWC Need real number!
+            } else {
+                mylog.error("UNABLE TO GET XDocumentInsertable INTERFACE!!!!!!!!!!!!!!!!!!!!!!!!!!");
+            }
+        } catch (java.lang.Exception ex) {
+            mylog.error("caught exception trying to find shape, etc...");
+            return -1;
+        }
+        * ===================================================================================================== *
+        * ===================================================================================================== *
+        * ===================================================================================================== */
+
         try {
             srcDoc = DecompUtil.openFileForProcessing(xDesktop, srcFileUrl);
         } catch (java.lang.Exception ex) {
@@ -755,51 +805,43 @@ public class DecompImpress {
             return -1;
         }
 
+        // Query for the XDrawPagesSupplier interfaces
         srcPagesSuppl =
                 (XDrawPagesSupplier) UnoRuntime.queryInterface(XDrawPagesSupplier.class, srcDoc);
         if (srcPagesSuppl == null) {
             mylog.error("Cannot get XDrawPagesSupplier interface for source Presentation Document???");
-            srcDoc.dispose();
+            du.closeDocument(xContext, srcDoc);
             return -1;
         }
 
         // Duplicate the original first page since we can't insert before it...
         XDrawPage destDP = getDrawPageByIndex(destDoc, 0);
-        XDrawPageDuplicator xdup = UnoRuntime.queryInterface(XDrawPageDuplicator.class, destDoc);
+        XDrawPageDuplicator xdup = (XDrawPageDuplicator) UnoRuntime.queryInterface(XDrawPageDuplicator.class, destDoc);
         xdup.duplicate(destDP);
 
         XDrawPages srcDrawPages = srcPagesSuppl.getDrawPages();
         int srcCount = srcDrawPages.getCount();
 
-        // First, get both documents into the correct Mode
-        executeDispatch(xContext, xDesktop, xMCF, destDoc, ".uno:DrawingMode", props);
-        executeDispatch(xContext, xDesktop, xMCF, srcDoc, ".uno:DrawingMode", props);
+        // First, get both documents into Slide Sorter Mode, and jump to the start
+        syncDispatch.execSyncDispatch(xContext, xDesktop, xMCF, srcDoc,  ".uno:DiaMode", props);
+        syncDispatch.execSyncDispatch(xContext, xDesktop, xMCF, srcDoc,  ".uno.GoToStart", props);
 
-        //executeDispatch(xContext, xDesktop, xMCF, destDoc, ".uno:NormalMultiPaneGUI", props);
-        //executeDispatch(xContext, xDesktop, xMCF, srcDoc, ".uno:NormalMultiPaneGUI", props);
-        //executeDispatch(xContext, xDesktop, xMCF, destDoc, ".uno:PageMode", props);
-        //executeDispatch(xContext, xDesktop, xMCF, srcDoc, ".uno:PageMode", props);
-        //executeDispatch(xContext, xDesktop, xMCF, destDoc, ".uno:InsertMode", props);
-        //executeDispatch(xContext, xDesktop, xMCF, srcDoc, ".uno:InsertMode", props);
-        //executeDispatch(xContext, xDesktop, xMCF, destDoc, ".uno:AdvancedMode", props);
-        //executeDispatch(xContext, xDesktop, xMCF, srcDoc, ".uno:AdvancedMode", props);
+        // Select all (pages) of the source document and copy
+        syncDispatch.execSyncDispatch(xContext, xDesktop, xMCF, srcDoc,  ".uno:SelectAll", props);
+        syncDispatch.execSyncDispatch(xContext, xDesktop, xMCF, srcDoc,  ".uno:Copy", props);
 
-        for (int i = 0; i < srcCount; i++) {
-            executeDispatch(xContext, xDesktop, xMCF, srcDoc, ".uno:SelectAll", props);
-            executeDispatch(xContext, xDesktop, xMCF, srcDoc, ".uno:Copy", props);
+        // Paste into Destination document and change it (back?) to Page (normal) mode
+        syncDispatch.execSyncDispatch(xContext, xDesktop, xMCF, destDoc, ".uno:DiaMode", props);
+        syncDispatch.execSyncDispatch(xContext, xDesktop, xMCF, destDoc, ".uno.GoToStart", props);
+        syncDispatch.execSyncDispatch(xContext, xDesktop, xMCF, destDoc, ".uno:Paste", props);
+        //DecompUtil.sleepFor(10);
+        syncDispatch.execSyncDispatch(xContext, xDesktop, xMCF, destDoc, ".uno:PageMode", props);
 
-            executeDispatch(xContext, xDesktop, xMCF, destDoc, ".uno:InsertPage", props);
-            executeDispatch(xContext, xDesktop, xMCF, destDoc, ".uno:Paste", props);
-            executeDispatch(xContext, xDesktop, xMCF, destDoc, ".uno:Paste", props);
-
-            XDrawPage srcPage = getDrawPageByIndex(srcDoc, 0);  // Since we delete them as we copy, we always want the first page!
-            XDrawPage destPage = getDrawPageByIndex(destDoc, i+1); // Because the new pages get inserted after the original first page
-
-            copyBackground(destPage, srcPage);
-            executeDispatch(xContext, xDesktop, xMCF, srcDoc, ".uno:DeletePage", props);
-
+        try {
+            du.closeDocument(xContext, srcDoc);
+        } catch (java.lang.Exception ex) {
+            mylog.error("insertFrontBoilerplate: source file already disposed??? (" + ex.getMessage() + ")");
         }
-        srcDoc.dispose();
 
         // Now remove the original first page
         destPagesSuppl =
@@ -811,7 +853,7 @@ public class DecompImpress {
     }
 
     // Based on http://www.oooforum.org/forum/viewtopic.phtml?t=48271
-    private void executeDispatch(XComponentContext xContext,
+    private void executeDispatchOriginal(XComponentContext xContext,
                                  XDesktop xDesktop,
                                  XMultiComponentFactory xMCF,
                                  Object pobjDoc,
@@ -872,6 +914,7 @@ public class DecompImpress {
                 xDP = (XDrawPage) UnoRuntime.queryInterface(
                         XDrawPage.class, xDrawPages.getByIndex(nIndex));
         } catch (Exception e) {
+            mylog.error("getDrawPage: Caught Exception!: " + e.getMessage());
             e.printStackTrace();
         } finally {
             return xDP;
@@ -886,6 +929,7 @@ public class DecompImpress {
                 xShape = (XShape) UnoRuntime.queryInterface(
                         XShape.class, xDrawPage.getByIndex(nIndex));
         } catch (Exception e) {
+            mylog.error("getPageShape: Caught Exception!: " + e.getMessage());
             e.printStackTrace();
         } finally {
             return xShape;
@@ -908,6 +952,7 @@ public class DecompImpress {
             }
             return null;
         } catch (java.lang.Exception e) {
+            mylog.error("getPageGroupShape: Caught Exception!: " + e.getMessage());
             e.printStackTrace();
             return null;
         }
