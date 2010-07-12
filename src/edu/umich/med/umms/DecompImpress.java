@@ -765,7 +765,7 @@ public class DecompImpress {
 
         // Duplicate the original first page since we can't insert before it...
         XDrawPage destDP = getDrawPageByIndex(destDoc, 0);
-        XDrawPageDuplicator xdup = UnoRuntime.queryInterface(XDrawPageDuplicator.class, destDoc);
+        XDrawPageDuplicator xdup = (XDrawPageDuplicator) UnoRuntime.queryInterface(XDrawPageDuplicator.class, destDoc);
         xdup.duplicate(destDP);
 
         XDrawPages srcDrawPages = srcPagesSuppl.getDrawPages();
