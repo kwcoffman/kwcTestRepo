@@ -739,7 +739,7 @@ public class DecompImpress {
                                       XDesktop xDesktop,
                                       XMultiComponentFactory xMCF,
                                       XComponent destDoc,
-                                      String srcFileUrl)
+                                      String srcFileUrl) throws DecompException
     {
         XComponent srcDoc = null;
         XDrawPagesSupplier destPagesSuppl;
@@ -822,6 +822,7 @@ public class DecompImpress {
         XDrawPages srcDrawPages = srcPagesSuppl.getDrawPages();
         int srcCount = srcDrawPages.getCount();
 
+        try {
         // First, get both documents into Slide Sorter Mode, and jump to the start
         syncDispatch.execSyncDispatch(xContext, xDesktop, xMCF, srcDoc,  ".uno:DiaMode", props);
         syncDispatch.execSyncDispatch(xContext, xDesktop, xMCF, srcDoc,  ".uno.GoToStart", props);
@@ -836,6 +837,10 @@ public class DecompImpress {
         syncDispatch.execSyncDispatch(xContext, xDesktop, xMCF, destDoc, ".uno:Paste", props);
         //DecompUtil.sleepFor(10);
         syncDispatch.execSyncDispatch(xContext, xDesktop, xMCF, destDoc, ".uno:PageMode", props);
+        } catch (java.lang.Exception ex) {
+            mylog.error("*** Should be initiating a retry because of Exception from dispatch! ***");
+            throw new DecompException("Exception while dispatching -- should retry!");
+        }
 
         try {
             du.closeDocument(xContext, srcDoc);

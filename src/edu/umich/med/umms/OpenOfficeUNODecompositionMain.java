@@ -70,7 +70,12 @@ public class OpenOfficeUNODecompositionMain {
         if (dp.getOperation() == DecompOperation.JSON) {
             errstring = decomp.processJsonFile(dp);
         } else {
-            errstring = decomp.processSingleFile(dp);
+            try {
+                errstring = decomp.processSingleFile(dp);
+            } catch (DecompException de) {
+                mylog.error("Single file operation.  Not re-trying!");
+                System.exit(1);
+            }
         }
 
         if (errstring != null) {

@@ -58,7 +58,7 @@ public class DecompSyncDispatch implements com.sun.star.frame.XDispatchResultLis
                                  XMultiComponentFactory xMCF,
                                  Object pobjDoc,
                                  String cmd,
-                                 PropertyValue[] props)
+                                 PropertyValue[] props) throws Exception
     {
         try {
             mylog.error("execSyncDispatch: ACQUIRING the lock (" + cmd + ")");
@@ -106,8 +106,9 @@ public class DecompSyncDispatch implements com.sun.star.frame.XDispatchResultLis
 
             }
         } catch (java.lang.Exception e) {
-            mylog.error("execSyncDispatch: Caught Exception: " + e.getMessage());
+            mylog.error("execSyncDispatch: Caught Exception: (RETHROWING IT)" + e.getMessage());
             e.printStackTrace();
+            throw(e);
         } finally {
             mylog.error("execSyncDispatch: RELEASING the lock (" + cmd + ")");
             dispatchLock.release();

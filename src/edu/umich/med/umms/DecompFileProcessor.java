@@ -34,6 +34,9 @@ public class DecompFileProcessor {
     private DecompCitationCollection citations;
     private DecompDelayedRemovalCollection imageRemovals;
 
+    private WatchDog watchdogThread;
+    private WatchDogAgain watchdogAgainThread;
+
     public DecompFileProcessor()
     {
         myutil = new DecompUtil();
@@ -245,7 +248,7 @@ public class DecompFileProcessor {
 
     }
 
-    
+
     private int save() throws java.lang.Exception
     {
         // Do some extra work for PowerPoint files
@@ -258,8 +261,13 @@ public class DecompFileProcessor {
             di.removeImages(xContext, xMCF, xCompDoc, imageRemovals);
 
             addedFrontPages = di.insertFrontBoilerplate(xContext, xDesktop, xMCF, xCompDoc, boilerplateUrl);
-            if (addedFrontPages < 0)
+            if (addedFrontPages < 0) {
                 addedFrontPages = 0;
+                if (addedFrontPages == -2) {
+                    // Retry the entire file?!?
+                    return -2;
+                }
+            }
             addCitationPages(di, addedFrontPages);
         }
 
@@ -288,12 +296,20 @@ public class DecompFileProcessor {
     }
 
 
-    public String doOperation(DecompParameters dp)
+    public String doOperation(DecompParameters dp) throws DecompException
     {
         String ret = null;
         int retcode = -1;
         if (!dp.ValidSingleOp())
             return logOperationInformation(dp, "Invalid parameters", null);
+//        System.err.println("doOperation:  creating new watchdog thread...");
+//        watchdogThread = new WatchDog(xContext);
+//        watchdogAgainThread = new WatchDogAgain();
+
+//        System.err.println("doOperation:  starting the watchdog monitor...");
+//        watchdogThread.start();
+//        watchdogAgainThread.start();
+//        System.err.println("doOperation:  now continuing with the operation at hand!");
         try {
             switch (dp.getOperation()) {
                 case EXTRACT:
@@ -309,12 +325,24 @@ public class DecompFileProcessor {
                     retcode = this.saveTo(dp.getOutputFile(), dp.getBoilerPlateFile());
                     break;
             }
+        } catch (DecompException de) {
+            mylog.error("doOperation: Caught DecompException (and re-throwing): " + de.getMessage());
+            throw de;
         } catch (java.lang.Exception e) {
-            ret = logOperationInformation(dp, "CAUGHT EXCEPTION", e.getMessage());
+            ret = logOperationInformation(dp, "doOperation: CAUGHT EXCEPTION: ", e.getMessage());
             e.printStackTrace();
-	    return ret;
+            throw new DecompException("doOperation: Exception while processing an operation -- should retry?");
+	    //return ret;
+        } finally {
+//            System.err.println("doOperation: [in finally] telling watchdog thread to quit");
+//            watchdogThread.signalHalt();
+//            watchdogAgainThread.signalOpCompleted(); // If we make it here, we want to cancel killing OpenOffice
         }
         if (retcode == 0) {
+            System.err.println("doOperation:  operation completed successfully!");
+            // XXX Perhaps do a join here?
+            // XXX That would just delay the real work while
+            //     waiting for the watchdog thread to complete?
             return null;
         } else {
             return logOperationInformation(dp, "OPERATION FAILED", null);

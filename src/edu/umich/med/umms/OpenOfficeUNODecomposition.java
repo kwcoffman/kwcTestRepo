@@ -8,6 +8,8 @@
 package edu.umich.med.umms;
 
 import java.io.IOException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.apache.commons.cli.BasicParser;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.OptionGroup;
@@ -103,12 +105,12 @@ public class OpenOfficeUNODecomposition {
         }
     }
 
-    private String processSingleFileOperation(DecompParameters dp, DecompFileProcessor fp)
+    private String processSingleFileOperation(DecompParameters dp, DecompFileProcessor fp) throws DecompException
     {
         return fp.doOperation(dp);
     }
 
-    public String processSingleFile(/*XComponentContext xContext, XDesktop xDesktop,*/ DecompParameters dp) {
+    public String processSingleFile(/*XComponentContext xContext, XDesktop xDesktop,*/ DecompParameters dp) throws DecompException {
         String ret = null;
         DecompFileProcessor fp = getFileProcessor(/*xContext, xDesktop,*/ dp.getInputFile());
         if (fp == null)
@@ -128,6 +130,7 @@ public class OpenOfficeUNODecomposition {
         int ret = 1;
         String retstring = null;
         String resultJsonFileName = dp.getJsonResultFile();
+        WatchDogAgain watchdogAgainThread = null;
         try {
             dj = new DecompJson(dp.getJsonCommandFile());
         } catch (java.lang.Exception e) {
@@ -144,17 +147,43 @@ public class OpenOfficeUNODecomposition {
         // Now process the commands...
         switch (dj.getVersion()) {
             case 1:
+                int retryCount = 0;
                 for (int i = 0; i < dj.getNumFiles(); i++) {
-                    DecompFileProcessor fp = getFileProcessor(/*xContext, xDesktop,*/ dj.getFile(i).getInputFile());
-                    if (fp != null) {
-                        for (int op = 0; op < dj.getFile(i).getNumOps(); op++) {
-                            DecompParameters ldp = new DecompParameters(dj.getFile(i), op);
-                            retstring = processSingleFileOperation(ldp, fp);
-                            dj.getFile(i).getFileOp(op).setOperationResult((retstring == null) ? 0 : 1, retstring);
+                    System.err.println("##### Processing file " + (i+1) +
+                            " of " + dj.getNumFiles() + ", retryCount is " +
+                            retryCount + " #####");
+                    if (retryCount != 0) {
+                        mylog.error("##### ATTEMPTING RETRY %d FOR FILE: %s, which is number %d of %d #####",
+                                retryCount, dj.getFile(i).getInputFile(), (i+1), dj.getNumFiles());
+                    }
+                    if (retryCount >= 3) {
+                        System.err.println("##### Too many errors processing file "
+                                + (i+1) + " of " + dj.getNumFiles() + ", giving up! #####");
+                        retryCount = 0; // reset this for the next file
+                        continue;
+                    }
+                    try {
+                        watchdogAgainThread = new WatchDogAgain();
+                        watchdogAgainThread.setTimer(60000);
+                        watchdogAgainThread.start();
+                        DecompFileProcessor fp = getFileProcessor(dj.getFile(i).getInputFile());
+                        if (fp != null) {
+                            for (int op = 0; op < dj.getFile(i).getNumOps(); op++) {
+                                DecompParameters ldp = new DecompParameters(dj.getFile(i), op);
+                                    retstring = processSingleFileOperation(ldp, fp);
+                                    dj.getFile(i).getFileOp(op).setOperationResult((retstring == null) ? 0 : 1, retstring);
+                            }
+                            closeFile(fp);
+                            retryCount = 0; // reset this on success of each file
+                        } else {
+                            dj.getFile(i).setFileResult(1, "Error opening file" + dj.getFile(i).getInputFile());
                         }
-                        closeFile(fp);
-                    } else {
-                        dj.getFile(i).setFileResult(1, "Error opening file" + dj.getFile(i).getInputFile());
+                    } catch (DecompException ex) {
+                        mylog.error("Caught exception, will attempt retry?");
+                        retryCount++;
+                        i--;  // retry the same file again
+                    } finally {
+                        watchdogAgainThread.signalOpCompleted();
                     }
                 }
                 break;
