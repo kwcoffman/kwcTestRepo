@@ -245,14 +245,21 @@ public class DecompFileProcessor {
     {
         // Do some extra work for PowerPoint files
         if (origFileFormat.getHandlerType() == 2) {
-            int addedFrontPages;
+            int addedFrontPages = 2;
             DecompImpress di = new DecompImpress();
             di.setLoggingLevel(myLogLevel);
 
             // Remove images before messing up page numbers!
             di.removeImages(xContext, xMCF, xCompDoc, imageRemovals);
 
-            addedFrontPages = di.insertFrontBoilerplate(xContext, xDesktop, xMCF, xCompDoc, boilerplateUrl);
+            /*
+             * NOTE: There are issues with the dispatch process used to add
+             * boilerplate pages.  It seems to work fine, on my local
+             * installation on a Mac, but there are OpenOffice failures
+             * when running on our Linux server machine.  Skip this step
+             * for now!!!
+             */
+            //addedFrontPages = di.insertFrontBoilerplate(xContext, xDesktop, xMCF, xCompDoc, boilerplateUrl);
             if (addedFrontPages < 0)
                 addedFrontPages = 0;
             addCitationPages(di, addedFrontPages);
