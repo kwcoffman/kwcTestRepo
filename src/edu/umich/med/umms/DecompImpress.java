@@ -165,8 +165,13 @@ public class DecompImpress {
                         if (pictureURL == null) {
                             du.exportImage(xContext, xMCF, currShape, outputDir, p+1, s);
                         } else {
-                            String outName = DecompUtil.constructBaseImageName(outputDir, p+1, s);
-                            du.extractImageByURL(xContext, xMCF, xCompDoc, pictureURL, outName);
+                            if (pictureURL.contains(".svm") || pictureURL.contains(".SVM")) {
+                                mylog.debug("extractImages: exporting SVM image as PNG!");
+                                du.exportImage(xContext, xMCF, currShape, outputDir, p+1, s);
+                            } else {
+                                String outName = DecompUtil.constructBaseImageName(outputDir, p+1, s);
+                                du.extractImageByURL(xContext, xMCF, xCompDoc, pictureURL, outName);
+                            }
                         }
                     } else if (currType.equalsIgnoreCase("com.sun.star.drawing.OLE2Shape")) {
                         mylog.debug("Handling OLE2Shape (%d) on page %d", s, p+1);
