@@ -23,7 +23,7 @@ public class CitationManipulate {
     private static final Pattern LIC_PATTERN = Pattern.compile(LIC_EXP);
 
     private static final String CC_LIC_LOC = "http://i.creativecommons.org/l/";
-    private static final String CC_BADGE_IMG_NAME = "88x31.png";
+    private static final String CC_BADGE_IMG_NAME = "80x15.png";
 
     private ArrayList<String> foundURLs = new ArrayList<String>();
     private Matcher urlMatcher;

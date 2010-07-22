@@ -229,12 +229,17 @@ public class DecompUtil {
     // Assumes that the original image shape is supplied
     public static Size calculateCitationImageSize(XShape xOrigImage)
     {
-        Point aPos = xOrigImage.getPosition();
-        Size aSize = xOrigImage.getSize();
+        // Using the original size results in an invalid shape!
+        //Size aSize = xOrigImage.getSize();
         Size citationSize = new Size();
 
-        citationSize.Width = 88 * 20; // Image is 88x31 pixels -- show it 20 times that size
-        citationSize.Height = 31 * 20;
+        // This assumes the original image is 80x15 pixels
+        // According to http://www.unitconversion.org//typography/pixels-x-to-millimeters-conversion.html
+        // one pixel == 0.26458333333333 mm
+        // So...
+
+        citationSize.Width = Math.round((float)80 * (float)26.45833);
+        citationSize.Height = Math.round((float)15 * (float)26.45833);
         return citationSize;
     }
 
